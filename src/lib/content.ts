@@ -23,3 +23,21 @@ export function groupsOf(pages: Page[], active?: Page) {
   }
   return [...groups].map(([title, links]) => ({ title, links }));
 }
+
+export type Post = CollectionEntry<'posts'>;
+
+/** RustingScience posts, newest first. */
+export const postsByDate = async () => (await getCollection('posts')).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+export const postHref = (p: Post) => u(`/science/${p.id}/`);
+export const postDate = (p: Post) => p.data.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** Sidebar: an "All posts" link, then posts grouped by year. */
+export function postGroups(posts: Post[], active?: Post) {
+  const years = new Map<string, { label: string; href: string; active: boolean }[]>();
+  for (const p of posts) {
+    const y = String(p.data.date.getUTCFullYear());
+    if (!years.has(y)) years.set(y, []);
+    years.get(y)!.push({ label: p.data.title, href: postHref(p), active: p.id === active?.id });
+  }
+  return [{ title: 'Science', links: [{ label: 'All posts', href: u('/science/'), active: !active }] }, ...[...years].map(([title, links]) => ({ title, links }))];
+}

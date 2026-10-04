@@ -1,27 +1,33 @@
 ---
 // Docs and tutorials frame: sidebar, scene banner with breadcrumbs, prose, optional TOC and pager.
+// `section` replaces the project switcher for pages outside a project (RustingScience); `project` then only picks the theme and scene.
 import Scene from './Scene.astro';
 import Icon from './Icon.astro';
 import { PROJECTS, IDS, u, type ProjectId } from '../data/projects';
 interface Link { label: string; href: string; active?: boolean }
 interface Props {
-  project: ProjectId; title: string; crumbs: string[];
+  project?: ProjectId; section?: { name: string; stem: string; sub: string }; title: string; crumbs: string[];
   groups: { title: string; links: Link[] }[];
   toc?: { depth: number; slug: string; text: string }[];
   prev?: { label: string; href: string }; next?: { label: string; href: string };
 }
-const { project, title, crumbs, groups, toc = [], prev, next } = Astro.props;
-const pr = PROJECTS[project];
+const { project, section, title, crumbs, groups, toc = [], prev, next } = Astro.props;
+const p = project && PROJECTS[project];
+const pr = { theme: p?.theme ?? 'copper', scene: p?.scene ?? 'forge', ...(section ?? { name: p!.name, stem: p!.stem, sub: 'Docs · latest' }) };
 const hasToc = toc.length > 1;
 ---
 <div class:list={['gr-root gr-docs', !hasToc && 'no-toc']} data-theme={pr.theme}>
   <aside class="gr-docs-side" aria-label={`${pr.name} navigation`}>
-    <button class="gr-docs-switch" type="button" popovertarget="gr-switch" aria-label={`${pr.name}, switch project`}>
-      <i></i><span><b>{pr.name}</b><small>Docs · latest</small></span><Icon name="chevronDown" />
-    </button>
-    <nav id="gr-switch" class="gr-menu gr-root" popover aria-label="Projects">
-      {IDS.map((id) => <a href={u(`/${id}/docs/`)} data-theme={PROJECTS[id].theme} aria-current={id === project ? 'page' : undefined}><i></i>{PROJECTS[id].name}</a>)}
-    </nav>
+    {section ? (
+      <div class="gr-docs-switch"><i></i><span><b>{pr.name}</b><small>{pr.sub}</small></span></div>
+    ) : (<>
+      <button class="gr-docs-switch" type="button" popovertarget="gr-switch" aria-label={`${pr.name}, switch project`}>
+        <i></i><span><b>{pr.name}</b><small>{pr.sub}</small></span><Icon name="chevronDown" />
+      </button>
+      <nav id="gr-switch" class="gr-menu gr-root" popover aria-label="Projects">
+        {IDS.map((id) => <a href={u(`/${id}/docs/`)} data-theme={PROJECTS[id].theme} aria-current={id === project ? 'page' : undefined}><i></i>{PROJECTS[id].name}</a>)}
+      </nav>
+    </>)}
     <button class="gr-search" type="button" data-search><Icon name="search" /><span>Search {pr.stem} docs</span><kbd class="gr-kbd">/</kbd></button>
     <nav aria-label="Sections">
       {groups.map((g) => (

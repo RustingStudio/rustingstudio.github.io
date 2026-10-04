@@ -66,5 +66,12 @@ export const PROJECTS: Record<ProjectId, Project> = {
 
 export const IDS: ProjectId[] = ['engine', 'brain', 'shader'];
 
+/** RustingScience: posts on the site, written in their own repository. Not a project, so no theme of its own. */
+export const SCIENCE = {
+  name: 'RustingScience', stem: 'Science', sub: 'Posts · research notes',
+  lede: 'Benchmarks, experiments and research notes on Rust, GPUs and machine learning. Every number comes with the script and the hardware that produced it.',
+  repo: GH + 'RustingScience',
+};
+
 /** Prefix a site path with the configured base ("/engine/docs/" → "/RustingStudioWebSite/engine/docs/"). */
 export const u = (p: string) => import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + p.replace(/^\//, '');

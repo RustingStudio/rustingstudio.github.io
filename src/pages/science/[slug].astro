@@ -1,0 +1,33 @@
+---
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import DocsShell from '../../components/DocsShell.astro';
+import Tag from '../../components/Tag.astro';
+import Icon from '../../components/Icon.astro';
+import { PROJECTS, SCIENCE } from '../../data/projects';
+import { postsByDate, postGroups, postHref, postDate, type Post } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const posts = await postsByDate();
+  return posts.map((entry, i) => ({ params: { slug: entry.id }, props: { entry, posts, i } }));
+}
+const { entry, posts, i } = Astro.props as { entry: Post; posts: Post[]; i: number };
+const { Content, headings } = await render(entry);
+const pr = entry.data.project && PROJECTS[entry.data.project];
+const link = (p?: Post) => p && { label: p.data.title, href: postHref(p) };
+---
+<Base title={`${entry.data.title} — RustingScience`} description={entry.data.description} theme={pr?.theme}>
+  <SiteHeader project={entry.data.project} active="Science" />
+  <DocsShell project={entry.data.project} section={SCIENCE} title={entry.data.title} crumbs={['RustingScience', postDate(entry)]}
+    groups={postGroups(posts, entry)} toc={headings.filter((h) => h.depth === 2 || h.depth === 3)}
+    prev={link(posts[i + 1])} next={link(posts[i - 1])}>
+    <Fragment slot="meta">
+      <Tag tone="accent">{entry.data.minutes} min read</Tag>
+      {pr && <Tag outline dot>{pr.name}</Tag>}
+      {entry.data.tags.map((t) => <Tag outline>{t}</Tag>)}
+      <a class="gr-tag gr-tag-outline" href={entry.data.source}>Source on GitHub <Icon name="arrowUpRight" /></a>
+    </Fragment>
+    <Content />
+  </DocsShell>
+</Base>

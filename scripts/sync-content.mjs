@@ -1,5 +1,6 @@
 // Pulls docs and tutorials from the RustingStudio repositories on GitHub into
-// src/content/pages/. Run with `npm run sync-content`, then commit the result.
+// src/content/pages/, and RustingScience posts into src/content/posts/.
+// Run with `npm run sync-content`, then commit the result.
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -126,4 +127,22 @@ for (const [project, m] of Object.entries(MANIFEST)) {
       console.log(`${project}/${kind}/${slug}  ${title}`);
     }
   }
+}
+
+// RustingScience: every posts/<slug>/index.md becomes /science/<slug>/. Front matter passes through as written.
+const SCIENCE = 'RustingScience';
+const POSTS = new URL('../src/content/posts/', import.meta.url);
+const sciTree = (await get(`https://api.github.com/repos/${ORG}/${SCIENCE}/git/trees/main?recursive=1`, 'json')).tree.map((t) => t.path);
+await rm(POSTS, { recursive: true, force: true });
+await mkdir(POSTS, { recursive: true });
+for (const file of sciTree.filter((p) => /^posts\/[^/]+\/index\.md$/.test(p))) {
+  const slug = file.split('/')[1];
+  const raw = await get(`https://raw.githubusercontent.com/${ORG}/${SCIENCE}/main/${file}`);
+  const [, fm, body] = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/) ?? [];
+  if (!fm) throw new Error(`${file}: no front matter`);
+  const md = convert(body, file, SCIENCE, new Map(), new Set(sciTree));
+  const minutes = Math.max(1, Math.round(md.replace(/```[\s\S]*?```/g, '').split(/\s+/).length / 230));
+  const source = `https://github.com/${ORG}/${SCIENCE}/blob/main/${file}`;
+  await writeFile(new URL(`${slug}.md`, POSTS), `---\n${fm}\nminutes: ${minutes}\nsource: ${JSON.stringify(source)}\n---\n${md.trimStart()}`);
+  console.log(`science/${slug}`);
 }

@@ -17,4 +17,18 @@ const pages = defineCollection({
   }),
 });
 
-export const collections = { pages };
+// RustingScience posts, written by the same script.
+const posts = defineCollection({
+  loader: glob({ pattern: '*.md', base: './src/content/posts' }),
+  schema: z.object({
+    title: z.string(),
+    date: z.coerce.date(),
+    description: z.string(),
+    tags: z.array(z.string()).default([]),
+    project: z.enum(['engine', 'brain', 'shader']).optional(),
+    minutes: z.number(),
+    source: z.string().url(),
+  }),
+});
+
+export const collections = { pages, posts };

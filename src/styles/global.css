@@ -226,7 +226,7 @@ body { margin: 0; background: var(--surface-100); color: var(--ink); font-family
 .gr-docs-link.is-active { color: var(--ink); background: var(--accent-soft); border-left-color: var(--accent); }
 .gr-docs-link .gr-tag { height: 20px; padding: 0 6px; font-size: 10px; margin-left: auto; }
 .gr-docs-main { min-width: 0; }
-.gr-docs-banner { position: relative; height: 196px; overflow: hidden; border-bottom: 1px solid var(--line-200); background: var(--surface-000); isolation: isolate; }
+.gr-docs-banner { position: relative; min-height: 196px; overflow: hidden; border-bottom: 1px solid var(--line-200); background: var(--surface-000); isolation: isolate; }
 .gr-docs-banner .gr-scene { z-index: -2; }
 .gr-docs-banner::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, var(--surface-000) 15%, rgba(15,21,27,.55) 55%, rgba(15,21,27,.1)); }
 .gr-docs-head { position: relative; max-width: calc(var(--prose-max) + 96px); padding: var(--space-8) var(--space-12) var(--space-6); }

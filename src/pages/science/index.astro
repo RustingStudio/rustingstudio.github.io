@@ -1,0 +1,23 @@
+---
+import Base from '../../layouts/Base.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import DocsShell from '../../components/DocsShell.astro';
+import TutorialPath from '../../components/TutorialPath.astro';
+import Tag from '../../components/Tag.astro';
+import Icon from '../../components/Icon.astro';
+import { SCIENCE } from '../../data/projects';
+import { postsByDate, postGroups, postHref, postDate } from '../../lib/content';
+
+const posts = await postsByDate();
+---
+<Base title="RustingScience" description={SCIENCE.lede}>
+  <SiteHeader active="Science" />
+  <DocsShell section={SCIENCE} title="RustingScience" crumbs={['RustingStudio', 'Science']} groups={postGroups(posts)}>
+    <Fragment slot="meta">
+      <Tag tone="accent">{`${posts.length} ${posts.length === 1 ? 'post' : 'posts'}`}</Tag>
+      <a class="gr-tag gr-tag-outline" href={SCIENCE.repo}>Source on GitHub <Icon name="arrowUpRight" /></a>
+    </Fragment>
+    <p>{SCIENCE.lede}</p>
+    <TutorialPath progress={false} steps={posts.map((p) => ({ title: p.data.title, href: postHref(p), summary: p.data.description, minutes: p.data.minutes, level: postDate(p) }))} />
+  </DocsShell>
+</Base>
