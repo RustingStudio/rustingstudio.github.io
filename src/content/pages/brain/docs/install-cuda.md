@@ -5,7 +5,7 @@ kind: "docs"
 group: "Start"
 order: 1
 description: "RustingBrain builds and trains on CPU by default. CUDA is needed only when you select TrainingBackend::Cuda; that backend is fail-closed and will return an error rather than silently train on CPU."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/INSTALL_CUDA.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/INSTALL_CUDA.md"
 ---
 RustingBrain builds and trains on CPU by default. CUDA is needed only when you
 select `TrainingBackend::Cuda`; that backend is fail-closed and will return an

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">RustingStudio</title>
+  <desc id="desc">An angular copper R with a cream accent and transparent background.</desc>
+  <path d="M40 28H164L212 76V120L172 160H128L220 228H160L84 158V228H40ZM84 72V116H150L168 98V90L150 72Z" fill="#ef925e" fill-rule="evenodd"/>
+  <path d="M108 28H140V72H108Z" fill="#f5eee3"/>
+</svg>

@@ -4,8 +4,8 @@
 <body>
 <div id="root" class="gr-root"></div>
 <script>
-  var G = window.GoingRusting, h = React.createElement;
-  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'pv' }, [['forge','copper','Forge — the G, extruded · home hero'],['engine','copper','Engine — polyhedra + 10k-cube field'],['brain','verdigris','Brain — neurons firing forward'],['shader','cobalt','Shader — lensed black hole']].map(function (s) { return h('div', { className: 'cell', key: s[0], 'data-theme': s[1] }, h(G.Scene, { kind: s[0], focusX: 0.5 }), h('span', { className: 'gr-kicker' }, s[2])); })));
+  var R = window.RustingStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'pv' }, [['forge','copper','Forge — the R, extruded · home hero'],['engine','copper','Engine — polyhedra + 10k-cube field'],['brain','verdigris','Brain — neurons firing forward'],['shader','cobalt','Shader — lensed black hole']].map(function (s) { return h('div', { className: 'cell', key: s[0], 'data-theme': s[1] }, h(R.Scene, { kind: s[0], focusX: 0.5 }), h('span', { className: 'gr-kicker' }, s[2])); })));
 </script>
 </body>
 </html>

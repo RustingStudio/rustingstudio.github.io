@@ -5,7 +5,7 @@ kind: "tutorials"
 group: "Foundations"
 order: 1
 description: "There is no CUDA to install, no Python version to fight, no pip dependency conflicts, no 500 MB of wheels. Two commands and you're training."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/2_setup.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/2_setup.md"
 minutes: 10
 ---
 **You need:** a computer. Windows, macOS, or Linux. Nothing else.

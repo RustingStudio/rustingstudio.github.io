@@ -5,7 +5,7 @@ kind: "docs"
 group: "Start"
 order: 2
 description: "A short tour of the ideas the tutorials rely on."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/concepts.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/concepts.md"
 ---
 A short tour of the ideas the tutorials rely on.
 

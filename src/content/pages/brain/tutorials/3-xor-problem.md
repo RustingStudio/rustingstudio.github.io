@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Foundations"
 order: 2
 description: "XOR is the \"hello world\" of neural networks, and not because it's cute. It is the smallest problem that proves you need a hidden layer. We'll solve it, and then we'll deliberately fail to solve it, because the failure teaches more than the success."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/3_xor_problem.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/3_xor_problem.md"
 minutes: 30
 ---
 **You need:** chapters 1 and 2.
 
 **Time:** 30 minutes.
 
-**Full code:** [`code/03_xor.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/03_xor.rs)
+**Full code:** [`code/03_xor.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/03_xor.rs)
 
 XOR is the "hello world" of neural networks, and not because it's cute. It is
 the smallest problem that *proves* you need a hidden layer. We'll solve it, and

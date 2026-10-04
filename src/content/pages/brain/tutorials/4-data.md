@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Foundations"
 order: 3
 description: "Chapter 3 had four hand-typed examples. Real data arrives in files, in the wrong units, with text where you need numbers. This chapter builds the pipeline that every remaining chapter uses:"
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/4_data.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/4_data.md"
 minutes: 45
 ---
 **You need:** chapters 1–3.
 
 **Time:** 45 minutes.
 
-**Full code:** [`code/04_data.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/04_data.rs) · **Data:** [`data/flowers.csv`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/data/flowers.csv)
+**Full code:** [`code/04_data.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/04_data.rs) · **Data:** [`data/flowers.csv`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/data/flowers.csv)
 
 Chapter 3 had four hand-typed examples. Real data arrives in files, in the wrong
 units, with text where you need numbers. This chapter builds the pipeline that

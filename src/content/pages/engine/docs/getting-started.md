@@ -5,7 +5,7 @@ kind: "docs"
 group: "Start"
 order: 1
 description: "This page takes you from a fresh checkout to a running game. It takes about 15 minutes, most of it the first compile."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/getting-started.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/getting-started.md"
 ---
 This page takes you from a fresh checkout to a running game. It takes about
 15 minutes, most of it the first compile.
@@ -57,7 +57,7 @@ Scene View controls follow Blender:
 | Action | Input |
 | --- | --- |
 | Select, add to selection | Click, `Shift`-click |
-| Move, rotate, scale the selection | `G`, `R`, `S`, then `X`, `Y`, or `Z` to lock an axis; click to confirm, right-click to cancel |
+| Move, rotate, scale the selection | `R`, `R`, `S`, then `X`, `Y`, or `Z` to lock an axis; click to confirm, right-click to cancel |
 | Focus the selection | `F` |
 | Fly | Hold the right mouse button, then `W` `A` `S` `D`, `Space` up, `Ctrl` down, `Shift` faster |
 | Orbit, pan, zoom | Middle mouse button, `Shift` + middle mouse button, wheel |

@@ -1,6 +1,6 @@
 # Site blueprint
 
-How the GoingRusting website is put together from this system. Every page is built from the components listed here; nothing else is needed.
+How the RustingStudio website is put together from this system. Every page is built from the components listed here; nothing else is needed.
 
 ## Map
 
@@ -17,8 +17,8 @@ How the GoingRusting website is put together from this system. Every page is bui
 The first viewport carries everything:
 
 1. `SiteHeader` (clear variant) — wordmark, Projects / Docs / Tutorials / Community, docs search (Ctrl K), GitHub.
-2. Kicker "RUST / GPU / POSSIBILITY", the `display-xl` wordmark, the tagline, one sentence of mission, two buttons: "Explore the projects" (primary) and "Read the docs" (secondary).
-3. The extruded G (`Scene kind="forge"`) on the right, over the blueprint grid.
+2. Kicker "RUST / GPU / CREATIVE TOOLS", the `display-xl` wordmark, the tagline, one sentence of mission, two buttons: "Explore the projects" (primary) and "Read the docs" (secondary).
+3. The extruded R (`Scene kind="forge"`) on the right, over the blueprint grid.
 4. One `ProjectTile` per project along the bottom: index, category, name, one-line description, its own live mini-scene in its own material.
 
 Scrolling then gives each project a full-bleed `ProjectPanel`: its scene filling the far side, name, lede, measured stats, feature tags, three actions (Read the docs · Tutorials · GitHub) and a real code sample floating over the scene.

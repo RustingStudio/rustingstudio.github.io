@@ -5,7 +5,7 @@ kind: "tutorials"
 group: "Foundations"
 order: 0
 description: "This chapter has no code. If you have never understood what a neural network _is_, this is the chapter that fixes that. Everything after this one is practical, and everything after this one assumes you read this one."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/1_introduction.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/1_introduction.md"
 minutes: 30
 ---
 **You need:** nothing. No Rust, no install, no maths degree. Just read.

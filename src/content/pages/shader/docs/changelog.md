@@ -5,7 +5,7 @@ kind: "docs"
 group: "Reference"
 order: 1
 description: "First public release."
-source: "https://github.com/GoingRusting/RustingShader/blob/main/CHANGELOG.md"
+source: "https://github.com/RustingStudio/RustingShader/blob/main/CHANGELOG.md"
 ---
 ## Unreleased
 

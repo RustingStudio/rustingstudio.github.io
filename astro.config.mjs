@@ -15,7 +15,7 @@ const rehypeBaseLinks = () => (tree) => {
 };
 
 export default defineConfig({
-  site: process.env.SITE_URL || 'https://goingrusting.github.io',
+  site: process.env.SITE_URL || 'https://rustingstudio.github.io',
   base,
   trailingSlash: 'always',
   markdown: {

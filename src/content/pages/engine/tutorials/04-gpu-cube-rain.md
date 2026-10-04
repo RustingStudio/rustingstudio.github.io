@@ -5,7 +5,7 @@ kind: "tutorials"
 group: "Tutorials"
 order: 3
 description: "You will drop 2,000 cubes simulated on the GPU, get an event back from the GPU when each one falls past a line, and show a counter on screen. This is the pattern for debris, swarms, and crowds: the GPU owns the bodies, and the CPU hears only about the moments it cares about."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/tutorials/04-gpu-cube-rain.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/tutorials/04-gpu-cube-rain.md"
 ---
 You will drop 2,000 cubes simulated on the GPU, get an event back from the
 GPU when each one falls past a line, and show a counter on screen. This is

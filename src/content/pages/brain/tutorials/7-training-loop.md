@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 6
 description: "So far fit(...) has been a black box: hand it a dataset, get a trained model. That's fine until training goes wrong — and you can't fix what you can't see."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/7_training_loop.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/7_training_loop.md"
 minutes: 60
 ---
 **You need:** chapters 1–6.
 
 **Time:** 1 hour.
 
-**Full code:** [`code/07_training_loop.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/07_training_loop.rs)
+**Full code:** [`code/07_training_loop.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/07_training_loop.rs)
 
 So far `fit(...)` has been a black box: hand it a dataset, get a trained model.
 That's fine until training goes wrong — and you can't fix what you can't see.

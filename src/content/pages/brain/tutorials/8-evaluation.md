@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 7
 description: "You can train a model. Now the harder skill: knowing how good it actually is."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/8_evaluation.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/8_evaluation.md"
 minutes: 45
 ---
 **You need:** chapters 1–7.
 
 **Time:** 45 minutes.
 
-**Full code:** [`code/08_evaluation.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/08_evaluation.rs)
+**Full code:** [`code/08_evaluation.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/08_evaluation.rs)
 
 You can train a model. Now the harder skill: knowing how good it *actually* is.
 

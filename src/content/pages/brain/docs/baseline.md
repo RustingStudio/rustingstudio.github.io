@@ -5,7 +5,7 @@ kind: "docs"
 group: "Reference"
 order: 3
 description: "Measured with examples/sweep_arch.rs, one configuration per process, on an otherwise idle RTX 3060 12 GB (desktop applications holding 1258 MiB)."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/docs/baseline.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/docs/baseline.md"
 ---
 Measured with `examples/sweep_arch.rs`, one configuration per process, on an
 otherwise idle RTX 3060 12 GB (desktop applications holding 1258 MiB).

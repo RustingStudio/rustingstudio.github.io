@@ -5,7 +5,7 @@ kind: "tutorials"
 group: "Tutorials"
 order: 2
 description: "The rusting_game! API from Tutorial 1 is one function per frame. Real games want ECS systems: code that queries components, reads input, and runs at a chosen stage. This tutorial adds two systems to the Coin Run game from Tutorial 2:"
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/tutorials/03-gameplay-plugin.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/tutorials/03-gameplay-plugin.md"
 ---
 The `rusting_game!` API from Tutorial 1 is one function per frame. Real
 games want ECS systems: code that queries components, reads input, and

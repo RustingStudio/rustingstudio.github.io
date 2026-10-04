@@ -1,6 +1,6 @@
-# GoingRusting website
+# RustingStudio website
 
-The site for the [GoingRusting](https://github.com/GoingRusting) organization: a welcome page for every project, plus docs and tutorials for each in its own theme.
+The site for the [RustingStudio](https://github.com/RustingStudio) organization: a welcome page for every project, plus docs and tutorials for each in its own theme.
 
 Astro (static output), Shiki for code, Pagefind for search. The look comes from `design-system/` — read `CLAUDE.md` before changing UI.
 

@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Going further"
 order: 11
 description: "Sooner or later you will want to run a model you did not train. A colleague trained it in Keras. You found one on Hugging Face. You prototyped in PyTorch because the plotting was easier, and now the thing has to live inside a Rust service."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/12_import_models.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/12_import_models.md"
 minutes: 45
 ---
 **You need:** chapters 1–10. Python, if you want to follow the export half.
 
 **Time:** 45 minutes.
 
-**Full code:** [`code/12_import_models.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/12_import_models.rs)
+**Full code:** [`code/12_import_models.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/12_import_models.rs)
 
 Sooner or later you will want to run a model you did not train. A colleague
 trained it in Keras. You found one on Hugging Face. You prototyped in PyTorch

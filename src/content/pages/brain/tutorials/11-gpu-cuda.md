@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Going further"
 order: 10
 description: "Everything so far ran on your CPU, and for the models in chapters 3–10 that was the right choice. A 200-parameter XOR network on a GPU is slower than on a CPU: the work takes microseconds and the round trip to the card takes longer than the work."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/11_gpu_cuda.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/11_gpu_cuda.md"
 minutes: 60
 ---
 **You need:** chapters 1–10, an NVIDIA GPU, and the CUDA toolkit.
 
 **Time:** 1 hour, plus however long the driver install takes.
 
-**Full code:** [`code/11_gpu_cuda.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/11_gpu_cuda.rs)
+**Full code:** [`code/11_gpu_cuda.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/11_gpu_cuda.rs)
 
 Everything so far ran on your CPU, and for the models in chapters 3–10 that was
 the right choice. A 200-parameter XOR network on a GPU is slower than on a CPU:

@@ -3,7 +3,7 @@
 // design system's chamfered code card around every block.
 import { createCssVariablesTheme } from 'shiki/core';
 
-export const theme = createCssVariablesTheme({ name: 'goingrusting', variablePrefix: '--shiki-', fontStyle: true });
+export const theme = createCssVariablesTheme({ name: 'rustingstudio', variablePrefix: '--shiki-', fontStyle: true });
 
 const NO_LN = new Set(['bash', 'sh', 'shell', 'console', 'powershell', 'text', 'plaintext', 'txt', '']);
 const ICON = (d, cls) => ({ type: 'element', tagName: 'svg', properties: { class: `gr-icon ${cls}`, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.75, 'stroke-linecap': 'square', 'stroke-linejoin': 'miter', 'aria-hidden': 'true' }, children: [{ type: 'element', tagName: 'path', properties: { d }, children: [] }] });
@@ -13,7 +13,7 @@ const text = (value) => ({ type: 'text', value });
 /** opts: { title?, highlight?: number[], lineNumbers?: boolean, floating?: boolean } — markdown reads title="…" from the fence meta. */
 export function grCode(opts = {}) {
   return {
-    name: 'goingrusting-code',
+    name: 'rustingstudio-code',
     line(node, line) {
       const hl = opts.highlight ?? [];
       if (hl.includes(line)) this.addClassToHast(node, 'is-hl');

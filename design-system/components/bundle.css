@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* ============ GoingRusting — base ============ */
+/* ============ RustingStudio — base ============ */
 .gr-root, .gr-root *, .gr-root *::before, .gr-root *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--surface-100); color: var(--ink); font-family: var(--font-sans); font-size: 16px; line-height: 26px; -webkit-font-smoothing: antialiased; }
 .gr-root { color: var(--ink); font-family: var(--font-sans); }
@@ -99,7 +99,7 @@ body { margin: 0; background: var(--surface-100); color: var(--ink); font-family
 .gr-hero-index { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); padding-bottom: var(--space-8); }
 @media (max-width: 900px) {
   .gr-hero { min-height: 0; }
-  .gr-hero-title { font-size: 52px; }
+  .gr-hero-title { font-size: clamp(40px, 13vw, 52px); }
   .gr-hero > .gr-scene { opacity: .4; }
   .gr-hero-shade { background: linear-gradient(0deg, var(--surface-100) 10%, rgba(22,25,29,.75) 60%, rgba(22,25,29,.35) 100%); }
   .gr-hero-index { grid-template-columns: 1fr; }

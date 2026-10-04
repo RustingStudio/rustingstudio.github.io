@@ -5,7 +5,7 @@ kind: "docs"
 group: "Guides"
 order: 3
 description: "The editor window is split into areas, as in Blender. Each area shows one editor type, such as Scene View, Hierarchy, or Inspector, and you can split, resize, and change areas freely. Every change to the scene can be undone."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/editor_gui.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/editor_gui.md"
 ---
 The editor window is split into areas, as in Blender. Each area shows one
 editor type, such as Scene View, Hierarchy, or Inspector, and you can split,
@@ -109,7 +109,7 @@ or removes them from it.
 
 The transform gizmo works like Blender's:
 
-1. Press `G` to move, `R` to rotate, or `S` to scale the selection. You can
+1. Press `R` to move, `R` to rotate, or `S` to scale the selection. You can
    also use the toolbar buttons, or drag a gizmo handle.
 2. Press `X`, `Y`, or `Z` to lock the change to one axis.
 3. Click to confirm. Right-click or `Escape` cancels and restores the old
@@ -304,7 +304,7 @@ every project.
 | Save scene | `Ctrl+S` |
 | Rename selection | `F2` |
 | Delete selection | `Delete` |
-| Move, rotate, scale | `G`, `R`, `S` |
+| Move, rotate, scale | `R`, `R`, `S` |
 | Lock to one axis | `X`, `Y`, `Z` |
 | Frame selection | `F` |
 | Fly mode on and off | `Numpad 0` |

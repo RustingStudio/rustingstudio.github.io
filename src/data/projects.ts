@@ -11,7 +11,7 @@ export interface Project {
   repo: string;
 }
 
-export const GH = 'https://github.com/GoingRusting/';
+export const GH = 'https://github.com/RustingStudio/';
 
 export const PROJECTS: Record<ProjectId, Project> = {
   engine: {
@@ -66,5 +66,5 @@ export const PROJECTS: Record<ProjectId, Project> = {
 
 export const IDS: ProjectId[] = ['engine', 'brain', 'shader'];
 
-/** Prefix a site path with the configured base ("/engine/docs/" → "/GoingRustingWebSite/engine/docs/"). */
+/** Prefix a site path with the configured base ("/engine/docs/" → "/RustingStudioWebSite/engine/docs/"). */
 export const u = (p: string) => import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + p.replace(/^\//, '');

@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 8
 description: "Everything so far has happened inside one program: train, measure, exit. The model died with the process."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/9_save_load.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/9_save_load.md"
 minutes: 40
 ---
 **You need:** chapters 1–8.
 
 **Time:** 40 minutes.
 
-**Full code:** [`code/09_save_load.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/09_save_load.rs)
+**Full code:** [`code/09_save_load.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/09_save_load.rs)
 
 Everything so far has happened inside one program: train, measure, exit. The
 model died with the process.

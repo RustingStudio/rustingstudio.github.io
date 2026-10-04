@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 9
 description: "Every chapter so far has been one main.rs that does one thing and exits. Real projects aren't shaped like that. This chapter builds the thing you'd actually ship:"
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/10_full_project.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/10_full_project.md"
 minutes: 90
 ---
 **You need:** chapters 1–9.
 
 **Time:** 90 minutes.
 
-**Full code:** [`code/10_full_project/`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/10_full_project/) — a real
+**Full code:** [`code/10_full_project/`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/10_full_project/) — a real
 multi-file cargo project, not a script.
 
 Every chapter so far has been one `main.rs` that does one thing and exits. Real

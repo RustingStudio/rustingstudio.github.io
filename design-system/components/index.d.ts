@@ -47,4 +47,4 @@ export declare function TutorialPath(props: TutorialPathProps): React.ReactEleme
 
 export declare function SiteFooter(props: {}): React.ReactElement;
 
-declare global { interface Window { GoingRusting: { Logo: typeof Logo; Button: typeof Button; Tag: typeof Tag; SiteHeader: typeof SiteHeader; Scene: typeof Scene; HomeHero: typeof HomeHero; ProjectTile: typeof ProjectTile; ProjectPanel: typeof ProjectPanel; StatRow: typeof StatRow; CodeBlock: typeof CodeBlock; Callout: typeof Callout; DocsShell: typeof DocsShell; TutorialPath: typeof TutorialPath; SiteFooter: typeof SiteFooter } } }
+declare global { interface Window { RustingStudio: { Logo: typeof Logo; Button: typeof Button; Tag: typeof Tag; SiteHeader: typeof SiteHeader; Scene: typeof Scene; HomeHero: typeof HomeHero; ProjectTile: typeof ProjectTile; ProjectPanel: typeof ProjectPanel; StatRow: typeof StatRow; CodeBlock: typeof CodeBlock; Callout: typeof Callout; DocsShell: typeof DocsShell; TutorialPath: typeof TutorialPath; SiteFooter: typeof SiteFooter } } }

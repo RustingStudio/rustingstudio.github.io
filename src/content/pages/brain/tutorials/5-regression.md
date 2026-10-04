@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 4
 description: "XOR answered yes/no. Now we predict a quantity: a house price, which could be 20 or 450 or anything between. That's regression, and it changes three things — the output activation, the loss, and (new this chapter) what you do with the target values."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/5_regression.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/5_regression.md"
 minutes: 45
 ---
 **You need:** chapters 1–4.
 
 **Time:** 45 minutes.
 
-**Full code:** [`code/05_regression.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/05_regression.rs) · **Data:** [`data/houses.csv`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/data/houses.csv)
+**Full code:** [`code/05_regression.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/05_regression.rs) · **Data:** [`data/houses.csv`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/data/houses.csv)
 
 XOR answered yes/no. Now we predict a **quantity**: a house price, which could
 be 20 or 450 or anything between. That's **regression**, and it changes three

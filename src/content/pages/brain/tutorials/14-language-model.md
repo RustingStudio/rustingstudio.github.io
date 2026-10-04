@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Language models"
 order: 13
 description: "Everything so far predicted one thing from a fixed set of features: a price from four columns, a class from three measurements. A language model predicts the next piece of text from all the text before it, and then does it again with its own output appended."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/14_language_model.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/14_language_model.md"
 minutes: 120
 ---
 **You need:** chapters 1–10. Chapter 11 if you want it to be fast.
 
 **Time:** 2 hours.
 
-**Full code:** [`code/14_language_model.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/14_language_model.rs)
+**Full code:** [`code/14_language_model.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/14_language_model.rs)
 
 Everything so far predicted one thing from a fixed set of features: a price
 from four columns, a class from three measurements. A language model predicts
@@ -447,7 +447,7 @@ the ordering rule that makes this actually work on a GPU.
 
 ## 14.8 The whole thing, small
 
-[`code/14_language_model.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/14_language_model.rs) trains a character-level
+[`code/14_language_model.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/14_language_model.rs) trains a character-level
 model on one paragraph until it can reproduce it, then generates from a prompt.
 It is deliberately tiny — 0.6M parameters, a few seconds on a CPU — because the
 point is to watch the machinery work end to end.

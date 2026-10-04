@@ -5,7 +5,7 @@ kind: "docs"
 group: "Guides"
 order: 2
 description: "RustingBrain runs external models through ONNX. Importing is inference-only: you can load a model trained in TensorFlow, Keras or PyTorch and run predictions from Rust, but training continues to belong in the original framework."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/IMPORT_MODELS.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/IMPORT_MODELS.md"
 ---
 RustingBrain runs external models through ONNX. Importing is inference-only: you
 can load a model trained in TensorFlow, Keras or PyTorch and run predictions

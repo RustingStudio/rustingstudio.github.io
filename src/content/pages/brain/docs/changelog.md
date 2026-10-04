@@ -5,7 +5,7 @@ kind: "docs"
 group: "Reference"
 order: 4
 description: "Everything here is additive except the seams around ImagePipeline: ImagePipeline::new takes a PromptEncoder in place of a tokenizer and an encoder and an ImageDenoiser in place of a Dit (a Dit converts into one, so passing one still compiles), the pipeline's tokenizer and encoder fields are now the one encoder field, its denoiser field is an ImageDenoiser, PipelineConfig has gained betas and solver fields, SamplingConfig has gained a solver field, and PromptEncoder::encode hands back the pooled vector alongside the states in place of the separate pool."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/CHANGELOG.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/CHANGELOG.md"
 ---
 ## Unreleased
 

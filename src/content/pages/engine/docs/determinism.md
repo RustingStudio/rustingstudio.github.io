@@ -5,7 +5,7 @@ kind: "docs"
 group: "Guides"
 order: 4
 description: "This page records the rules behind DeterminismMode (Milestone 8). Off promises nothing. Local promises identical results on one machine and build. CrossPlatform promises identical results on every supported device. The rules in this page are what CrossPlatform enforces."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/determinism.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/determinism.md"
 ---
 This page records the rules behind `DeterminismMode` (Milestone 8). `Off`
 promises nothing. `Local` promises identical results on one machine and

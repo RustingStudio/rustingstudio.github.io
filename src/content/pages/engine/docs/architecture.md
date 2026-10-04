@@ -5,7 +5,7 @@ kind: "docs"
 group: "Reference"
 order: 6
 description: "This document records boundaries that must remain stable as the roadmap is implemented. New features should fit these boundaries instead of reaching across layers. If a boundary must change, update this document and add a migration plan before changing public APIs."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/architecture.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/architecture.md"
 ---
 This document records boundaries that must remain stable as the roadmap is implemented. New features should fit these boundaries instead of reaching across layers. If a boundary must change, update this document and add a migration plan before changing public APIs.
 

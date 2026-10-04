@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "Language models"
 order: 14
 description: "Chapter 14's model ran every parameter for every token. A 300M-parameter model did 300M parameters' worth of arithmetic per token, and a 3B one did ten times that. Capacity and cost move together, which is a problem when you have one GPU."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/15_mixture_of_experts.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/15_mixture_of_experts.md"
 minutes: 90
 ---
 **You need:** chapter 14.
 
 **Time:** 90 minutes.
 
-**Full code:** [`code/15_mixture_of_experts.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/15_mixture_of_experts.rs)
+**Full code:** [`code/15_mixture_of_experts.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/15_mixture_of_experts.rs)
 
 Chapter 14's model ran every parameter for every token. A 300M-parameter model
 did 300M parameters' worth of arithmetic per token, and a 3B one did ten times
@@ -274,7 +274,7 @@ claims for parameter count. The speed claim is hardware-dependent, and on a
 
 ## 15.7 Watching routing
 
-[`code/15_mixture_of_experts.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/15_mixture_of_experts.rs) does two
+[`code/15_mixture_of_experts.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/15_mixture_of_experts.rs) does two
 things a loss curve cannot show you.
 
 First, it prints total and active as the expert count changes, straight from

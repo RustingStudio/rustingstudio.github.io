@@ -22,13 +22,13 @@ const items: [string, string][] = [
   <button class="gr-search" type="button" aria-label="Search documentation" data-search>
     <Icon name="search" /><span>Search docs</span><kbd class="gr-kbd">Ctrl K</kbd>
   </button>
-  <a class="gr-btn gr-btn-ghost gr-header-gh" href="https://github.com/GoingRusting">GitHub<Icon name="arrowUpRight" /></a>
+  <a class="gr-btn gr-btn-ghost gr-header-gh" href="https://github.com/RustingStudio">GitHub<Icon name="arrowUpRight" /></a>
   <button class="gr-btn gr-btn-ghost gr-header-menu" type="button" aria-label="Open menu" popovertarget="gr-menu"><Icon name="menu" /></button>
   <nav id="gr-menu" class="gr-menu gr-root" popover aria-label="Menu">
     {items.map(([label, href]) => <a href={href} aria-current={active === label ? 'page' : undefined}>{label}</a>)}
     <h6>Docs</h6>
     {IDS.map((id) => <a href={u(`/${id}/docs/`)} data-theme={PROJECTS[id].theme}><i></i>{PROJECTS[id].name}</a>)}
     <button class="gr-search" type="button" data-search><Icon name="search" /><span>Search docs</span></button>
-    <a href="https://github.com/GoingRusting">GitHub <Icon name="arrowUpRight" /></a>
+    <a href="https://github.com/RustingStudio">GitHub <Icon name="arrowUpRight" /></a>
   </nav>
 </header>

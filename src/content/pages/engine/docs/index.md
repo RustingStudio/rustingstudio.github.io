@@ -5,13 +5,13 @@ kind: "docs"
 group: "Start"
 order: 0
 description: "10,000 GPU-simulated cubes at more than 2,000 FPS on an RTX 3060. RustingEngine is built for physics-heavy scenes that can overwhelm traditional CPU-first engines long before the GPU is fully used."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/README.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/README.md"
 ---
 **10,000 GPU-simulated cubes at more than 2,000 FPS on an RTX 3060.**
 RustingEngine is built for physics-heavy scenes that can overwhelm traditional
 CPU-first engines long before the GPU is fully used.
 
-![10,000 cubes orbiting a planet at 2,191 FPS](https://raw.githubusercontent.com/GoingRusting/RustingEngine/main/docs/images/spaceCubes.jpg)
+![10,000 cubes orbiting a planet at 2,191 FPS](https://raw.githubusercontent.com/RustingStudio/RustingEngine/main/docs/images/spaceCubes.jpg)
 
 The screenshot shows the current native space demo in a 1920×1080 release
 build. All 10,000 satellites are rendered through instancing and updated with
@@ -86,10 +86,10 @@ You need stable Rust and a Vulkan-capable driver. Linux and Windows are the
 primary platforms.
 
 New to the engine? Follow [Getting started](/engine/docs/getting-started/) and the
-[tutorials](https://github.com/GoingRusting/RustingEngine/blob/main/docs/README.md).
+[tutorials](https://github.com/RustingStudio/RustingEngine/blob/main/docs/README.md).
 
 ```bash
-git clone https://github.com/GoingRusting/RustingEngine.git
+git clone https://github.com/RustingStudio/RustingEngine.git
 cd RustingEngine
 ./scripts/run_editor.sh
 ```
@@ -347,8 +347,8 @@ corrects the background and tone mapping with a scene patch afterwards.
 
 Procedural objects can share a class, material, mesh, and GPU physics profile.
 GPU rules can then watch that class and send only matching events back to Rust.
-See [the included space project](https://github.com/GoingRusting/RustingEngine/blob/main/testGame/src/main.rs) and
-[hybrid GPU example](https://github.com/GoingRusting/RustingEngine/blob/main/src/examples/hybrid_10k.rs) for complete examples.
+See [the included space project](https://github.com/RustingStudio/RustingEngine/blob/main/testGame/src/main.rs) and
+[hybrid GPU example](https://github.com/RustingStudio/RustingEngine/blob/main/src/examples/hybrid_10k.rs) for complete examples.
 
 ## Project layout
 
@@ -368,26 +368,26 @@ See [the included space project](https://github.com/GoingRusting/RustingEngine/b
 
 More documentation:
 
-- [Documentation index](https://github.com/GoingRusting/RustingEngine/blob/main/docs/README.md): getting started, core concepts, and
+- [Documentation index](https://github.com/RustingStudio/RustingEngine/blob/main/docs/README.md): getting started, core concepts, and
   tutorials
-- [Game-making skill for LLM agents](https://github.com/GoingRusting/RustingEngine/blob/main/skills/rusting-game/SKILL.md): copy
+- [Game-making skill for LLM agents](https://github.com/RustingStudio/RustingEngine/blob/main/skills/rusting-game/SKILL.md): copy
   it to `.claude/skills/rusting-game/` or give it to any agent that builds
   games with the `rusting` CLI
 - [Editor guide](/engine/docs/editor/)
 - [Architecture](/engine/docs/architecture/)
 - [Roadmap](/engine/docs/roadmap/)
-- [Release guide](https://github.com/GoingRusting/RustingEngine/blob/main/RELEASE.md)
-- [Contributing](https://github.com/GoingRusting/RustingEngine/blob/main/CONTRIBUTING.md)
+- [Release guide](https://github.com/RustingStudio/RustingEngine/blob/main/RELEASE.md)
+- [Contributing](https://github.com/RustingStudio/RustingEngine/blob/main/CONTRIBUTING.md)
 
 ## Contributing
 
 Bug reports, profiling results, documentation fixes, and focused pull requests
-are welcome. Please read [CONTRIBUTING.md](https://github.com/GoingRusting/RustingEngine/blob/main/CONTRIBUTING.md) before opening a PR.
+are welcome. Please read [CONTRIBUTING.md](https://github.com/RustingStudio/RustingEngine/blob/main/CONTRIBUTING.md) before opening a PR.
 Performance changes should include the scene, hardware, resolution, build mode,
 and before/after measurements so results can be reproduced.
 
 ## License
 
-RustingEngine uses the [Rusting Engine License 1.0](https://github.com/GoingRusting/RustingEngine/blob/main/LICENSE.md). Games and other
+RustingEngine uses the [Rusting Engine License 1.0](https://github.com/RustingStudio/RustingEngine/blob/main/LICENSE.md). Games and other
 created works may be commercial. Redistribution of the engine is subject to the
 license terms and attribution requirements.

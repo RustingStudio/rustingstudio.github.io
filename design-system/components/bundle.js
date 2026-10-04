@@ -1,4 +1,4 @@
-/* @ds-bundle: {"format":4,"namespace":"GoingRusting","components":[{"name":"Logo"},{"name":"Button"},{"name":"Tag"},{"name":"SiteHeader"},{"name":"Scene"},{"name":"HomeHero"},{"name":"ProjectTile"},{"name":"ProjectPanel"},{"name":"StatRow"},{"name":"CodeBlock"},{"name":"Callout"},{"name":"DocsShell"},{"name":"TutorialPath"},{"name":"SiteFooter"}]} */
+/* @ds-bundle: {"format":4,"namespace":"RustingStudio","components":[{"name":"Logo"},{"name":"Button"},{"name":"Tag"},{"name":"SiteHeader"},{"name":"Scene"},{"name":"HomeHero"},{"name":"ProjectTile"},{"name":"ProjectPanel"},{"name":"StatRow"},{"name":"CodeBlock"},{"name":"Callout"},{"name":"DocsShell"},{"name":"TutorialPath"},{"name":"SiteFooter"}]} */
 (function () {
   "use strict";
   var React = window.React;
@@ -8,7 +8,7 @@
   function cx() { return Array.prototype.filter.call(arguments, Boolean).join(" "); }
 
   /* ------------------------------------------------------------------ data */
-  var GH = "https://github.com/GoingRusting/";
+  var GH = "https://github.com/RustingStudio/";
   var PROJECTS = {
     engine: {
       id: "engine", theme: "copper", scene: "engine", index: "01",
@@ -83,15 +83,15 @@
   }
 
   /* ------------------------------------------------------------------ Logo */
-  // Exact geometry of GoingRusting.svg (the angular copper G with the cream cap).
+  // Exact geometry of RustingStudio.svg (the angular copper R with the cream cap).
   function Logo(p) {
     var size = p.size || 32;
-    var mark = h("svg", { width: size, height: size, viewBox: "0 0 256 256", role: p.wordmark ? undefined : "img", "aria-label": p.wordmark ? undefined : "GoingRusting", "aria-hidden": p.wordmark ? true : undefined },
-      h("path", { d: "M220 32H92L36 88V168L92 224H220V128H152", fill: "none", stroke: "var(--copper)", strokeWidth: 30, strokeLinecap: "square", strokeLinejoin: "miter" }),
-      h("path", { d: "M186 32H220", fill: "none", stroke: "var(--ink)", strokeWidth: 30 }));
+    var mark = h("svg", { width: size, height: size, viewBox: "0 0 256 256", role: p.wordmark ? undefined : "img", "aria-label": p.wordmark ? undefined : "RustingStudio", "aria-hidden": p.wordmark ? true : undefined },
+      h("path", { d: "M40 28H164L212 76V120L172 160H128L220 228H160L84 158V228H40ZM84 72V116H150L168 98V90L150 72Z", fill: "var(--copper)", fillRule: "evenodd" }),
+      h("path", { d: "M108 28H140V72H108Z", fill: "var(--ink)" }));
     return h(p.href ? "a" : "span", { className: cx("gr-logo", p.className), href: p.href },
       mark,
-      p.wordmark ? h("span", { className: "gr-logo-word", style: { fontSize: Math.round(size * 0.62) + "px" } }, "Going", h("b", null, "Rusting")) : null);
+      p.wordmark ? h("span", { className: "gr-logo-word", style: { fontSize: Math.round(size * 0.62) + "px" } }, "Rusting", h("b", null, "Studio")) : null);
   }
 
   /* ---------------------------------------------------------------- Button */
@@ -126,7 +126,7 @@
         })),
       h("button", { className: "gr-search", type: "button", "aria-label": "Search documentation" },
         h(Icon, { name: "search" }), h("span", null, "Search docs"), h("kbd", { className: "gr-kbd" }, "Ctrl K")),
-      h("a", { className: "gr-btn gr-btn-ghost gr-header-gh", href: "https://github.com/GoingRusting" }, "GitHub", h(Icon, { name: "arrowUpRight" })),
+      h("a", { className: "gr-btn gr-btn-ghost gr-header-gh", href: "https://github.com/RustingStudio" }, "GitHub", h(Icon, { name: "arrowUpRight" })),
       h("button", { className: "gr-btn gr-btn-ghost gr-header-menu", type: "button", "aria-label": "Open menu" }, h(Icon, { name: "menu" })));
   }
 
@@ -158,37 +158,24 @@
   }
   function rng(seed) { var s = seed >>> 0 || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
 
-  /* -- forge: the extruded G mark ------------------------------------------ */
-  function strokeOutline(pts, hw) {
-    var n = pts.length, L = [], R = [];
-    function nrm(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; }
-    for (var i = 0; i < n; i++) {
-      if (i === 0 || i === n - 1) {
-        var q = i === 0 ? nrm(pts[0], pts[1]) : nrm(pts[n - 2], pts[n - 1]);
-        L.push([pts[i][0] + q[0] * hw, pts[i][1] + q[1] * hw]); R.push([pts[i][0] - q[0] * hw, pts[i][1] - q[1] * hw]);
-      } else {
-        var n1 = nrm(pts[i - 1], pts[i]), n2 = nrm(pts[i], pts[i + 1]);
-        var m = [n1[0] + n2[0], n1[1] + n2[1]], ml = Math.hypot(m[0], m[1]); m = [m[0] / ml, m[1] / ml];
-        var d = hw / (m[0] * n1[0] + m[1] * n1[1]);
-        L.push([pts[i][0] + m[0] * d, pts[i][1] + m[1] * d]); R.push([pts[i][0] - m[0] * d, pts[i][1] - m[1] * d]);
-      }
-    }
-    return L.concat(R.reverse());
-  }
-  function prism(outline, z0, z1) {
-    var front = outline.map(function (p) { return [p[0] - 128, 128 - p[1], z0]; });
-    var back = outline.map(function (p) { return [p[0] - 128, 128 - p[1], z1]; });
+  /* -- forge: the extruded R mark ------------------------------------------ */
+  function prism(outline, z0, z1, holes) {
+    var contours = [outline].concat(holes || []);
+    var front = contours.map(function (ring) { return ring.map(function (p) { return [p[0] - 128, 128 - p[1], z0]; }); });
+    var back = contours.map(function (ring) { return ring.map(function (p) { return [p[0] - 128, 128 - p[1], z1]; }); });
     var sides = [];
-    for (var i = 0; i < outline.length; i++) {
-      var j = (i + 1) % outline.length;
-      sides.push([front[j], front[i], back[i], back[j]]);
-    }
-    return { front: front, back: back.slice().reverse(), sides: sides };
+    contours.forEach(function (ring, k) {
+      for (var i = 0; i < ring.length; i++) {
+        var j = (i + 1) % ring.length;
+        sides.push([front[k][j], front[k][i], back[k][i], back[k][j]]);
+      }
+    });
+    return { front: front[0], holes: front.slice(1), back: back[0].slice().reverse(), sides: sides };
   }
   function makeForge() {
-    // Centre line + square caps of the G path "M220 32H92L36 88V168L92 224H220V128H152"
-    var G = prism(strokeOutline([[235, 32], [92, 32], [36, 88], [36, 168], [92, 224], [220, 224], [220, 128], [137, 128]], 15), -18, 18);
-    var CAP = prism([[186, 17], [220, 17], [220, 47], [186, 47]], -18.6, 18);
+    // Exact silhouette, opening, and aligned cream stripe from RustingStudio.svg.
+    var MARK = prism([[40, 28], [164, 28], [212, 76], [212, 120], [172, 160], [128, 160], [220, 228], [160, 228], [84, 158], [84, 228], [40, 228]], -18, 18, [[[84, 72], [84, 116], [150, 116], [168, 98], [168, 90], [150, 72]]]);
+    var CAP = prism([[108, 28], [140, 28], [140, 72], [108, 72]], -18.6, 18);
     var r = rng(7), sparks = [];
     for (var i = 0; i < 70; i++) sparks.push({ a: r() * 6.283, rad: 150 + r() * 120, y: (r() - 0.5) * 220, sp: 0.08 + r() * 0.22, s: 0.6 + r() * 1.6, tw: r() * 6 });
     return {
@@ -241,10 +228,11 @@
           for (var i = 0; i < pts.length; i++) { var j = (i + 1) % pts.length; area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1]; }
           return { pts: pts, area: area, z: pts.reduce(function (s, p) { return s + p[2]; }, 0) / pts.length, base: base, edge: edge, edgeA: edgeA, poly: poly };
         }
-        var frontG = face(G.front, col.accent, col.hot, 0.25);
-        var sign = frontG.area > 0 ? 1 : -1;
+        var frontR = face(MARK.front, col.accent, col.hot, 0.25);
+        var frontHole = face(MARK.holes[0], col.accent, col.hot, 0);
+        var sign = frontR.area > 0 ? 1 : -1;
         var faces = [];
-        [G, CAP].forEach(function (obj, k) {
+        [MARK, CAP].forEach(function (obj, k) {
           obj.sides.forEach(function (q) {
             var fc = face(q, k ? col.hot : col.accent, col.accent, 0.2);
             if (fc.area * sign <= 0) return;
@@ -265,9 +253,9 @@
         faces.forEach(function (fc) { fill(fc, 1); });
         // front face with a subtle sheen
         ctx.save();
-        ctx.beginPath(); frontG.pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.closePath();
-        ctx.fillStyle = rgba(col.accent, 1); ctx.fill();
-        ctx.clip();
+        ctx.beginPath(); [frontR, frontHole].forEach(function (ring) { ring.pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.closePath(); });
+        ctx.fillStyle = rgba(col.accent, 1); ctx.fill("evenodd");
+        ctx.clip("evenodd");
         var sx = c0[0] + Math.sin(t * 0.5) * 220 * scale;
         var sh = ctx.createLinearGradient(sx - 120 * scale, 0, sx + 120 * scale, H);
         sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.5, "rgba(255,255,255,0.14)"); sh.addColorStop(1, "rgba(255,255,255,0)");
@@ -683,14 +671,14 @@
       h("div", { className: "gr-hero-shade" }),
       h(SiteHeader, { clear: true, active: p.active }),
       h("div", { className: "gr-container gr-hero-body" },
-        h("span", { className: "gr-kicker" }, "Rust / GPU / Possibility"),
-        h("h1", { className: "gr-hero-title" }, "Going", h("b", null, "Rusting")),
-        h("p", { className: "gr-hero-tagline" }, "Rethinking engines, learning, and graphics."),
+        h("span", { className: "gr-kicker" }, "Rust / GPU / Creative tools"),
+        h("h1", { className: "gr-hero-title" }, "Rusting", h("b", null, "Studio")),
+        h("p", { className: "gr-hero-tagline" }, "Engines, intelligence, and graphics."),
         h("p", { className: "gr-hero-lede" }, "We explore how Rust and GPU computing can reshape game engines, machine learning, and real-time graphics."),
         h("div", { className: "gr-hero-cta" },
           h(Button, { size: "lg", arrow: true, href: "#projects" }, "Explore the projects"),
           h(Button, { size: "lg", variant: "secondary", icon: "book", href: "#docs" }, "Read the docs")),
-        h("div", { className: "gr-hero-motto" }, "BUILD. MEASURE. EXPLORE.")),
+        h("div", { className: "gr-hero-motto" }, "BUILD. MEASURE. CREATE.")),
       h("div", { className: "gr-container gr-hero-index", id: "projects" },
         ["engine", "brain", "shader"].map(function (id) { return h(ProjectTile, { key: id, project: id, still: p.still }); })));
   }
@@ -789,9 +777,9 @@
             h("p", null, "Independent projects exploring how Rust and GPU computing can reshape engines, learning, and graphics.")),
           col("Projects", [["RustingEngine", GH + "RustingEngine", "copper"], ["RustingBrain", GH + "RustingBrain", "verdigris"], ["RustingShader", GH + "RustingShader", "cobalt"]]),
           col("Learn", [["Docs", "#docs"], ["Tutorials", "#tutorials"], ["Releases", GH + "RustingEngine/releases"]]),
-          col("Community", [["Contributing", GH + ".github/blob/main/CONTRIBUTING.md"], ["Support", GH + ".github/blob/main/SUPPORT.md"], ["Code of Conduct", GH + ".github/blob/main/CODE_OF_CONDUCT.md"], ["GitHub", "https://github.com/GoingRusting"]])),
+          col("Community", [["Contributing", GH + ".github/blob/main/CONTRIBUTING.md"], ["Support", GH + ".github/blob/main/SUPPORT.md"], ["Code of Conduct", GH + ".github/blob/main/CODE_OF_CONDUCT.md"], ["GitHub", "https://github.com/RustingStudio"]])),
         h("div", { className: "gr-footer-bottom" },
-          h("span", { className: "gr-footer-motto" }, "BUILD. MEASURE. EXPLORE."),
+          h("span", { className: "gr-footer-motto" }, "BUILD. MEASURE. CREATE."),
           h("span", null, "Projects evolve independently — check each repository for platform support and license terms."))));
   }
 
@@ -800,5 +788,5 @@
     ProjectTile: ProjectTile, ProjectPanel: ProjectPanel, StatRow: StatRow, CodeBlock: CodeBlock, Callout: Callout,
     DocsShell: DocsShell, TutorialPath: TutorialPath, SiteFooter: SiteFooter, PROJECTS: PROJECTS
   };
-  window.GoingRusting = Object.assign(window.GoingRusting || {}, api);
+  window.RustingStudio = Object.assign(window.RustingStudio || {}, api);
 })();

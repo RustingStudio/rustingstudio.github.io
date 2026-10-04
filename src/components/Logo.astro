@@ -1,13 +1,13 @@
 ---
-// Same geometry as design-system/assets/Logos/GoingRusting.svg; never redraw it.
+// Same geometry as design-system/assets/Logos/RustingStudio.svg; never redraw it.
 interface Props { size?: number; wordmark?: boolean; href?: string; class?: string }
 const { size = 32, wordmark, href, class: cls } = Astro.props;
 const Tag = href ? 'a' : 'span';
 ---
-<Tag class:list={['gr-logo', cls]} href={href} aria-label={href ? 'GoingRusting home' : undefined}>
-  <svg width={size} height={size} viewBox="0 0 256 256" role={wordmark ? undefined : 'img'} aria-label={wordmark ? undefined : 'GoingRusting'} aria-hidden={wordmark ? 'true' : undefined}>
-    <path d="M220 32H92L36 88V168L92 224H220V128H152" fill="none" stroke="var(--copper)" stroke-width="30" stroke-linecap="square" stroke-linejoin="miter" />
-    <path d="M186 32H220" fill="none" stroke="var(--ink)" stroke-width="30" />
+<Tag class:list={['gr-logo', cls]} href={href} aria-label={href ? 'RustingStudio home' : undefined}>
+  <svg width={size} height={size} viewBox="0 0 256 256" role={wordmark ? undefined : 'img'} aria-label={wordmark ? undefined : 'RustingStudio'} aria-hidden={wordmark ? 'true' : undefined}>
+    <path d="M40 28H164L212 76V120L172 160H128L220 228H160L84 158V228H40ZM84 72V116H150L168 98V90L150 72Z" fill="var(--copper)" fill-rule="evenodd" />
+    <path d="M108 28H140V72H108Z" fill="var(--ink)" />
   </svg>
-  {wordmark && <span class="gr-logo-word" style={`font-size:${Math.round(size * 0.62)}px`}>Going<b>Rusting</b></span>}
+  {wordmark && <span class="gr-logo-word" style={`font-size:${Math.round(size * 0.62)}px`}>Rusting<b>Studio</b></span>}
 </Tag>

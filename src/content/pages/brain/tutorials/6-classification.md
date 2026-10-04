@@ -5,14 +5,14 @@ kind: "tutorials"
 group: "The dense toolkit"
 order: 5
 description: "Chapter 5 predicted a number. Now we pick one option out of three: which species is this flower? Along the way we'll meet the metric that lies to more beginners than any other in machine learning."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/6_classification.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/6_classification.md"
 minutes: 45
 ---
 **You need:** chapters 1–5.
 
 **Time:** 45 minutes.
 
-**Full code:** [`code/06_classification.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/06_classification.rs) · **Data:** [`data/flowers.csv`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/data/flowers.csv)
+**Full code:** [`code/06_classification.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/06_classification.rs) · **Data:** [`data/flowers.csv`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/data/flowers.csv)
 
 Chapter 5 predicted a number. Now we pick **one option out of three**: which
 species is this flower? Along the way we'll meet the metric that lies to more

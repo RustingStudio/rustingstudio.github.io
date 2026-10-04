@@ -1,4 +1,6 @@
 # Logos
 
-- `GoingRusting.svg` — the mark: copper `#ef925e` G (stroke 30, square caps, miter joins) with a cream `#f5eee3` cap, transparent ground. Two fixed inks; use on `surface-000`/`surface-100`.
-- `GoingRusting.png` — 1024×1024 raster of the mark on `surface-100`, for avatars and social cards.
+- `RustingStudio.svg` — the approved angular R: copper `#ef925e`, a cream `#f5eee3` stripe aligned with the inner opening, and a transparent background. Filled paths with an even-odd opening. Use on `surface-000`/`surface-100`.
+- `RustingStudio.png` — 1024×1024 raster of the mark on `surface-100`.
+
+The 2D Logo and extruded forge scene use the same silhouette, opening, and accent coordinates.

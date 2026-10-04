@@ -5,7 +5,7 @@ kind: "tutorials"
 group: "Tutorials"
 order: 1
 description: "You will create a complete 2D platformer, play it, change it without opening the editor, catch the change breaking the level with an automated test, take a screenshot, and export a finished build. Every step uses the rusting CLI, so the same loop works in scripts, CI, and for coding agents."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/tutorials/02-coin-run-cli.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/tutorials/02-coin-run-cli.md"
 ---
 You will create a complete 2D platformer, play it, change it without opening
 the editor, catch the change breaking the level with an automated test,

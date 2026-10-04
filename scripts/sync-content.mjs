@@ -1,9 +1,9 @@
-// Pulls docs and tutorials from the GoingRusting repositories on GitHub into
+// Pulls docs and tutorials from the RustingStudio repositories on GitHub into
 // src/content/pages/. Run with `npm run sync-content`, then commit the result.
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const ORG = 'GoingRusting';
+const ORG = 'RustingStudio';
 const OUT = new URL('../src/content/pages/', import.meta.url);
 
 // [repo path, slug, group, title override?, extra frontmatter?]
@@ -69,7 +69,7 @@ const MANIFEST = {
 };
 
 const get = async (url, as = 'text') => {
-  const res = await fetch(url, { headers: { 'User-Agent': 'goingrusting-site-sync' } });
+  const res = await fetch(url, { headers: { 'User-Agent': 'rustingstudio-site-sync' } });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res[as]();
 };
@@ -81,6 +81,8 @@ const plain = (s) => s.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*`]/g
 
 function convert(md, file, repo, routes, tree) {
   const dir = path.posix.dirname(file);
+  // Imported upstream prose may still contain links from before the organization rename.
+  md = md.replace(/(https:\/\/(?:github\.com|raw\.githubusercontent\.com)\/)GoingRusting\//g, `$1${ORG}/`);
   // Only touch prose, never fenced code.
   const parts = md.split(/^(```[\s\S]*?^```)/m);
   for (let i = 0; i < parts.length; i += 2) {

@@ -5,7 +5,7 @@ kind: "docs"
 group: "Reference"
 order: 7
 description: "Mesa's lavapipe is the supported software Vulkan implementation for running GPU-touching code and tests on a machine with no display and no discrete GPU."
-source: "https://github.com/GoingRusting/RustingEngine/blob/main/docs/dev-environment.md"
+source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/dev-environment.md"
 ---
 ## Software Vulkan device (lavapipe)
 

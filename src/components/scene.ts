@@ -37,37 +37,24 @@ function rot(p: Vec, ay: number, ax: number, az?: number): Vec {
 }
 function rng(seed: number) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
 
-/* -- forge: the extruded G mark ------------------------------------------ */
-function strokeOutline(pts: Vec[], hw: number): Vec[] {
-  const n = pts.length, L: Vec[] = [], R: Vec[] = [];
-  const nrm = (a: Vec, b: Vec) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [-dy / l, dx / l]; };
-  for (let i = 0; i < n; i++) {
-    if (i === 0 || i === n - 1) {
-      const q = i === 0 ? nrm(pts[0], pts[1]) : nrm(pts[n - 2], pts[n - 1]);
-      L.push([pts[i][0] + q[0] * hw, pts[i][1] + q[1] * hw]); R.push([pts[i][0] - q[0] * hw, pts[i][1] - q[1] * hw]);
-    } else {
-      const n1 = nrm(pts[i - 1], pts[i]), n2 = nrm(pts[i], pts[i + 1]);
-      let m = [n1[0] + n2[0], n1[1] + n2[1]]; const ml = Math.hypot(m[0], m[1]); m = [m[0] / ml, m[1] / ml];
-      const d = hw / (m[0] * n1[0] + m[1] * n1[1]);
-      L.push([pts[i][0] + m[0] * d, pts[i][1] + m[1] * d]); R.push([pts[i][0] - m[0] * d, pts[i][1] - m[1] * d]);
-    }
-  }
-  return L.concat(R.reverse());
-}
-function prism(outline: Vec[], z0: number, z1: number) {
-  const front = outline.map((p) => [p[0] - 128, 128 - p[1], z0]);
-  const back = outline.map((p) => [p[0] - 128, 128 - p[1], z1]);
+/* -- forge: the extruded R mark ------------------------------------------ */
+function prism(outline: Vec[], z0: number, z1: number, holes: Vec[][] = []) {
+  const contours = [outline, ...holes];
+  const front = contours.map((ring) => ring.map((p) => [p[0] - 128, 128 - p[1], z0]));
+  const back = contours.map((ring) => ring.map((p) => [p[0] - 128, 128 - p[1], z1]));
   const sides: Vec[][] = [];
-  for (let i = 0; i < outline.length; i++) {
-    const j = (i + 1) % outline.length;
-    sides.push([front[j], front[i], back[i], back[j]]);
-  }
-  return { front, back: back.slice().reverse(), sides };
+  contours.forEach((ring, k) => {
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + 1) % ring.length;
+      sides.push([front[k][j], front[k][i], back[k][i], back[k][j]]);
+    }
+  });
+  return { front: front[0], holes: front.slice(1), back: back[0].slice().reverse(), sides };
 }
 function makeForge(): Draw {
-  // Centre line + square caps of the G path "M220 32H92L36 88V168L92 224H220V128H152"
-  const G = prism(strokeOutline([[235, 32], [92, 32], [36, 88], [36, 168], [92, 224], [220, 224], [220, 128], [137, 128]], 15), -18, 18);
-  const CAP = prism([[186, 17], [220, 17], [220, 47], [186, 47]], -18.6, 18);
+  // Exact silhouette, opening, and aligned cream stripe from RustingStudio.svg.
+  const MARK = prism([[40, 28], [164, 28], [212, 76], [212, 120], [172, 160], [128, 160], [220, 228], [160, 228], [84, 158], [84, 228], [40, 228]], -18, 18, [[[84, 72], [84, 116], [150, 116], [168, 98], [168, 90], [150, 72]]]);
+  const CAP = prism([[108, 28], [140, 28], [140, 72], [108, 72]], -18.6, 18);
   const r = rng(7), sparks: { a: number; rad: number; y: number; sp: number; s: number; tw: number }[] = [];
   for (let i = 0; i < 70; i++) sparks.push({ a: r() * 6.283, rad: 150 + r() * 120, y: (r() - 0.5) * 220, sp: 0.08 + r() * 0.22, s: 0.6 + r() * 1.6, tw: r() * 6 });
   return (ctx, t, W, H, col, par, opt) => {
@@ -120,10 +107,11 @@ function makeForge(): Draw {
       for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1]; }
       return { pts, area, z: pts.reduce((s, p) => s + p[2], 0) / pts.length, base, edge, edgeA };
     };
-    const frontG = face(G.front, col.accent, col.hot, 0.25);
-    const sign = frontG.area > 0 ? 1 : -1;
+    const frontR = face(MARK.front, col.accent, col.hot, 0.25);
+    const frontHole = face(MARK.holes[0], col.accent, col.hot, 0);
+    const sign = frontR.area > 0 ? 1 : -1;
     const faces: Face[] = [];
-    [G, CAP].forEach((obj, k) => {
+    [MARK, CAP].forEach((obj, k) => {
       obj.sides.forEach((q) => {
         const fc = face(q, k ? col.hot : col.accent, col.accent, 0.2);
         if (fc.area * sign <= 0) return;
@@ -136,7 +124,7 @@ function makeForge(): Draw {
       });
     });
     faces.sort((a, b) => b.z - a.z);
-    const path = (fc: Face) => { ctx.beginPath(); fc.pts.forEach((p, i) => { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.closePath(); };
+    const path = (fc: Face, holes: Face[] = []) => { ctx.beginPath(); [fc, ...holes].forEach((ring) => { ring.pts.forEach((p, i) => { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.closePath(); }); };
     const fill = (fc: Face, alpha: number) => {
       path(fc);
       ctx.fillStyle = rgba(fc.base, alpha); ctx.fill();
@@ -145,9 +133,9 @@ function makeForge(): Draw {
     faces.forEach((fc) => fill(fc, 1));
     // front face with a subtle sheen
     ctx.save();
-    path(frontG);
-    ctx.fillStyle = rgba(col.accent, 1); ctx.fill();
-    ctx.clip();
+    path(frontR, [frontHole]);
+    ctx.fillStyle = rgba(col.accent, 1); ctx.fill('evenodd');
+    ctx.clip('evenodd');
     const sx = c0[0] + Math.sin(t * 0.5) * 220 * scale;
     const sh = ctx.createLinearGradient(sx - 120 * scale, 0, sx + 120 * scale, H);
     sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.14)'); sh.addColorStop(1, 'rgba(255,255,255,0)');

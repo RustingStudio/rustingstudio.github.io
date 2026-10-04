@@ -5,13 +5,13 @@ kind: "tutorials"
 group: "Language models"
 order: 15
 description: "Chapter 14 trained a model on one paragraph in a few seconds. This chapter is about the version that runs for a week, and everything that only becomes a problem at that length."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/16_training_an_llm.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/16_training_an_llm.md"
 ---
 **You need:** chapters 14 and 15, and chapter 11 if you have a GPU.
 
 **Time:** an afternoon to set up. Days to run.
 
-**Full code:** [`code/16_training_an_llm.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/16_training_an_llm.rs)
+**Full code:** [`code/16_training_an_llm.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/16_training_an_llm.rs)
 
 Chapter 14 trained a model on one paragraph in a few seconds. This chapter is
 about the version that runs for a week, and everything that only becomes a
@@ -474,7 +474,7 @@ it is much cheaper to fix.
 
 ## 16.8 The script
 
-[`code/16_training_an_llm.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/16_training_an_llm.rs) is a complete
+[`code/16_training_an_llm.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/16_training_an_llm.rs) is a complete
 training program at a size that finishes: a held-out split, gradient
 accumulation, a warmup-cosine schedule, periodic evaluation, a checkpoint, and
 a resume that restores the optimizer state in the right order.
@@ -582,4 +582,4 @@ principles with no Python in the loop.
 The reference documentation is in the source — every public type carries the
 reasoning behind it, which is the part that does not fit in a tutorial.
 
-**Back to:** [the index](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/README.md)
+**Back to:** [the index](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/README.md)

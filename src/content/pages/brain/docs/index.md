@@ -5,7 +5,7 @@ kind: "docs"
 group: "Start"
 order: 0
 description: "A deep-learning library in Rust, from a two-layer XOR network up to a 300M-parameter transformer language model trained on one desktop GPU."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/README.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/README.md"
 ---
 A deep-learning library in Rust, from a two-layer XOR network up to a
 300M-parameter transformer language model trained on one desktop GPU.
@@ -37,7 +37,7 @@ These are single-GPU numbers on one architecture family. There is no
 multi-GPU, no distributed training, and no CPU-offload path; if your run needs
 those, use PyTorch. Per-architecture throughput for other shapes is in
 [docs/baseline.md](/brain/docs/baseline/), and the optimization work behind the
-table is in [docs/optimize-plan.md](https://github.com/GoingRusting/RustingBrain/blob/main/docs/optimize-plan.md).
+table is in [docs/optimize-plan.md](https://github.com/RustingStudio/RustingBrain/blob/main/docs/optimize-plan.md).
 
 ## What is in the box
 
@@ -573,7 +573,7 @@ flow in the other direction.
 
 ## Tutorials
 
-Sixteen chapters in [tutorials/](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/README.md), from what a neural
+Sixteen chapters in [tutorials/](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/README.md), from what a neural
 network is to training a language model end to end. Chapters 1–10 need nothing
 but Rust; 11 and 14–16 want a GPU.
 
@@ -600,4 +600,4 @@ RustingBrain is released under the RustingBrain License 1.0. You can use,
 modify, and distribute it, including in commercial projects, but redistributed
 copies must keep the license and credit Vasyl Trefilov as the original author.
 
-See [LICENSE.md](https://github.com/GoingRusting/RustingBrain/blob/main/LICENSE.md) for the full terms.
+See [LICENSE.md](https://github.com/RustingStudio/RustingBrain/blob/main/LICENSE.md) for the full terms.

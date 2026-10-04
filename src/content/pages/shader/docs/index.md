@@ -5,7 +5,7 @@ kind: "docs"
 group: "Start"
 order: 0
 description: "A cinematic Iris shader pack for Minecraft, with a black hole in the End."
-source: "https://github.com/GoingRusting/RustingShader/blob/main/README.md"
+source: "https://github.com/RustingStudio/RustingShader/blob/main/README.md"
 ---
 **A cinematic Iris shader pack for Minecraft, with a black hole in the End.**
 
@@ -17,7 +17,7 @@ in the universe. Plain GLSL 1.20, no build step: drop the folder in and play.
 
 ### The End
 
-![The End](https://raw.githubusercontent.com/GoingRusting/RustingShader/main/docs/images/end.png)
+![The End](https://raw.githubusercontent.com/RustingStudio/RustingShader/main/docs/images/end.png)
 
 ### Rain
 
@@ -97,7 +97,7 @@ in the universe. Plain GLSL 1.20, no build step: drop the folder in and play.
 
 1. Install [Iris](https://modrinth.com/mod/iris) (with Sodium).
 2. Download `RustingShader-vX.Y.zip` from the
-   [Releases](https://github.com/GoingRusting/RustingShader/releases) page and put it,
+   [Releases](https://github.com/RustingStudio/RustingShader/releases) page and put it,
    **still zipped**, into `.minecraft/shaderpacks/`.
    (The green "Code → Download ZIP" button does not work directly: it wraps
    everything in an extra folder, so Iris cannot find `shaders/`.)
@@ -109,7 +109,7 @@ Press **R** in game (Iris reload key) after editing a shader.
 
 Everything is in the in-game shader menu, grouped into screens: shadows,
 lighting, water, clouds, sky, post-processing, and End. Defaults live in
-[`shaders/lib/settings.glsl`](https://github.com/GoingRusting/RustingShader/blob/main/shaders/lib/settings.glsl).
+[`shaders/lib/settings.glsl`](https://github.com/RustingStudio/RustingShader/blob/main/shaders/lib/settings.glsl).
 
 Most useful knobs:
 
@@ -150,6 +150,6 @@ python3 tools/preview.py out.png  # needs moderngl, numpy, pillow
 
 ## License
 
-RustingShader is released under the [RustingShader License 1.0](https://github.com/GoingRusting/RustingShader/blob/main/LICENSE.md).
+RustingShader is released under the [RustingShader License 1.0](https://github.com/RustingStudio/RustingShader/blob/main/LICENSE.md).
 You may use, modify and redistribute it, including in modpacks and commercial
 content, as long as you keep the license and credit the original author.

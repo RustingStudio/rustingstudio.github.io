@@ -5,13 +5,13 @@ kind: "tutorials"
 group: "Going further"
 order: 12
 description: "This is a reference chapter, not a lesson. Nothing here is new material; it is the list of things that actually go wrong and what each one means."
-source: "https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/13_troubleshooting.md"
+source: "https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/13_troubleshooting.md"
 ---
 **You need:** chapters 1–10.
 
 **Time:** read it once, then come back to it.
 
-**Full code:** [`code/13_diagnostics.rs`](https://github.com/GoingRusting/RustingBrain/blob/main/tutorials/code/13_diagnostics.rs)
+**Full code:** [`code/13_diagnostics.rs`](https://github.com/RustingStudio/RustingBrain/blob/main/tutorials/code/13_diagnostics.rs)
 
 This is a reference chapter, not a lesson. Nothing here is new material; it is
 the list of things that actually go wrong and what each one means.

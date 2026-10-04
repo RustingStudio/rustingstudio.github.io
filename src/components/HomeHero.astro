@@ -14,15 +14,15 @@ const { active, still } = Astro.props;
   <div class="gr-hero-shade"></div>
   <SiteHeader clear active={active} />
   <div class="gr-container gr-hero-body">
-    <span class="gr-kicker">Rust / GPU / Possibility</span>
-    <h1 class="gr-hero-title">Going<b>Rusting</b></h1>
-    <p class="gr-hero-tagline">Rethinking engines, learning, and graphics.</p>
+    <span class="gr-kicker">Rust / GPU / Creative tools</span>
+    <h1 class="gr-hero-title">Rusting<b>Studio</b></h1>
+    <p class="gr-hero-tagline">Engines, intelligence, and graphics.</p>
     <p class="gr-hero-lede">We explore how Rust and GPU computing can reshape game engines, machine learning, and real-time graphics.</p>
     <div class="gr-hero-cta">
       <Button size="lg" arrow href="#projects">Explore the projects</Button>
       <Button size="lg" variant="secondary" icon="book" href={u('/engine/docs/')}>Read the docs</Button>
     </div>
-    <div class="gr-hero-motto">BUILD. MEASURE. EXPLORE.</div>
+    <div class="gr-hero-motto">BUILD. MEASURE. CREATE.</div>
   </div>
   <div class="gr-container gr-hero-index" id="projects">
     {IDS.map((id) => <ProjectTile project={id} still={still} />)}
