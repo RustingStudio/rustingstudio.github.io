@@ -107,7 +107,8 @@ body { margin: 0; background: var(--surface-100); color: var(--ink); font-family
 .gr-hero-lede { font-size: 16px; line-height: 26px; color: var(--ink-muted); margin: var(--space-3) 0 0; max-width: 480px; }
 .gr-hero-cta { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8); }
 .gr-hero-motto { margin-top: var(--space-12); font-family: var(--font-mono); font-size: 12px; letter-spacing: .18em; color: var(--ink-faint); }
-.gr-hero-index { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); padding-bottom: var(--space-8); }
+.gr-hero-index { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); padding-bottom: var(--space-8); }
+@media (max-width: 1100px) { .gr-hero-index { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 900px) {
   .gr-hero { min-height: 0; }
   .gr-hero-title { font-size: clamp(40px, 13vw, 52px); }

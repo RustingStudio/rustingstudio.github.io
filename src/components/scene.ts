@@ -5,7 +5,7 @@
 
 import { startBlackHole } from './blackhole';
 
-export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader';
+export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader' | 'strata';
 export interface SceneOptions { still?: boolean; density?: number; focusX?: number; focusY?: number; fill?: number; seed?: number; interactive?: boolean }
 
 type RGB = number[];
@@ -379,7 +379,94 @@ function makeShader(opt: SceneOptions): Draw {
   };
 }
 
-const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader };
+/* -- strata: stacked MoE layers; tokens descend and light their top-k experts.
+   Solid cells live on the GPU, outlined ones on the CPU; a CPU expert that keeps
+   getting routed to swaps places with the coldest GPU one (adaptive placement). */
+function makeStrata(opt: SceneOptions): Draw {
+  const r = rng(31), LAYERS = 6, G = 6, CELL = 30, GAP = 38, K = 4, GAP_Y = 64;
+  const layers = Array.from({ length: LAYERS }, () => Array.from({ length: G * G }, () => ({ gpu: r() < 0.6, act: r() * 0.4, heat: 0 })));
+  const tokens: { y: number; v: number; next: number; beams: { l: number; c: number }[] }[] = [];
+  const top = ((LAYERS - 1) / 2) * GAP_Y + 50;
+  const spawn = (y = top) => tokens.push({ y, v: 70 + r() * 40, next: 0, beams: [] });
+  const n = Math.round(3 * (opt.density || 1)) || 1;
+  for (let i = 0; i < n; i++) spawn(top - (i / n) * (top * 2));
+  let last = 0;
+  return (ctx, t, W, H, col, par, opt) => {
+    const dt = Math.min(0.05, Math.max(0, t - last)); last = t;
+    const narrow = W < 760;
+    const cxp = W * (narrow ? 0.5 : (opt.focusX || 0.68)), cyp = H * 0.5;
+    const sc = Math.min(W * (narrow ? 1.2 : 0.9), H * 1.25) / 620, cam = 900, f = 800;
+    const yaw = t * 0.08 + 0.6 + par.x * 0.5, pitch = 0.42 + par.y * 0.2 + Math.sin(t * 0.2) * 0.04;
+    const P = (v: Vec) => { const q = rot(v, yaw, pitch); const z = q[2] + cam; return [cxp + q[0] * f / z * sc, cyp - q[1] * f / z * sc, z]; };
+    const ly = (l: number) => ((LAYERS - 1) / 2 - l) * GAP_Y;
+    const cc = (c: number) => [((c % G) - (G - 1) / 2) * GAP, ((c / G | 0) - (G - 1) / 2) * GAP];
+
+    const glow = ctx.createRadialGradient(cxp, cyp, 0, cxp, cyp, 360 * sc);
+    glow.addColorStop(0, rgba(col.accent, 0.16)); glow.addColorStop(1, rgba(col.accent, 0));
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+    // tokens: route at each layer they cross
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const tk = tokens[i]; tk.y -= tk.v * dt;
+      while (tk.next < LAYERS && tk.y <= ly(tk.next)) {
+        const L = layers[tk.next]; tk.beams = [];
+        for (let k = 0; k < K; k++) {
+          const c = Math.floor(r() * L.length); L[c].act = 1; L[c].heat += 1; tk.beams.push({ l: tk.next, c });
+          if (!L[c].gpu && L[c].heat > 3) {
+            let cold = -1; L.forEach((e, j) => { if (e.gpu && (cold < 0 || e.heat < L[cold].heat)) cold = j; });
+            if (cold >= 0) { L[cold].gpu = false; L[c].gpu = true; }
+          }
+        }
+        L.forEach((e) => { e.heat *= 0.9; });
+        tk.next++;
+      }
+      if (tk.y < -top) { tokens.splice(i, 1); spawn(); }
+    }
+
+    // cells, back to front
+    const cells: { pts: number[][]; z: number; e: { gpu: boolean; act: number } }[] = [];
+    layers.forEach((L, l) => L.forEach((e, c) => {
+      e.act *= Math.pow(0.25, dt);
+      const [x, z] = cc(c), h = CELL / 2, y = ly(l);
+      const pts = [[x - h, y, z - h], [x + h, y, z - h], [x + h, y, z + h], [x - h, y, z + h]].map(P);
+      cells.push({ pts, z: (pts[0][2] + pts[2][2]) / 2, e });
+    }));
+    cells.sort((a, b) => b.z - a.z);
+    ctx.lineWidth = 1;
+    cells.forEach(({ pts, z, e }) => {
+      const dz = Math.max(0, Math.min(1, (cam + 260 - z) / 520));
+      ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
+      const c = mix(col.accent, col.hot, e.act);
+      if (e.gpu) { ctx.fillStyle = rgba(mix(col.bg, c, 0.3 + dz * 0.35 + e.act * 0.35), 0.9); ctx.fill(); }
+      ctx.strokeStyle = rgba(c, (e.gpu ? 0.35 : 0.22) + dz * 0.3 + e.act * 0.4); ctx.stroke();
+    });
+
+    // spine, beams and token heads
+    ctx.globalCompositeOperation = 'lighter';
+    const a = P([0, top, 0]), b = P([0, -top, 0]);
+    const sp = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+    sp.addColorStop(0, rgba(col.accent, 0)); sp.addColorStop(0.5, rgba(col.accent, 0.35)); sp.addColorStop(1, rgba(col.accent, 0));
+    ctx.strokeStyle = sp; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    tokens.forEach((tk) => {
+      const hp = P([0, tk.y, 0]);
+      tk.beams.forEach(({ l, c }) => {
+        const e = layers[l][c], [x, z] = cc(c), q = P([x, ly(l), z]), o = P([0, ly(l), 0]);
+        ctx.strokeStyle = rgba(col.hot, e.act * 0.8); ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+        const g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], 18 * sc);
+        g.addColorStop(0, rgba(col.hot, 0.55 * e.act)); g.addColorStop(1, rgba(col.hot, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], 18 * sc, 0, 6.283); ctx.fill();
+      });
+      const g = ctx.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], 14 * sc);
+      g.addColorStop(0, rgba(col.hot, 0.9)); g.addColorStop(1, rgba(col.hot, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hp[0], hp[1], 14 * sc, 0, 6.283); ctx.fill();
+      ctx.fillStyle = rgba(col.hot, 1); ctx.beginPath(); ctx.arc(hp[0], hp[1], 2.4, 0, 6.283); ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  };
+}
+
+const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader, strata: makeStrata };
 
 export function startScene(canvas: HTMLCanvasElement, kind: SceneKind, opt: SceneOptions): () => void {
   // The black hole is the pack's own GLSL in WebGL; makeShader stays as the no-WebGL fallback.

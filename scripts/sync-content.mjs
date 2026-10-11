@@ -67,6 +67,15 @@ const MANIFEST = {
     ],
     tutorials: [],
   },
+  strata: {
+    repo: 'RustingStrata',
+    docs: [
+      ['README.md', 'index', 'Start', 'Overview'],
+      ['docs/baseline.md', 'baseline', 'Reference'],
+      ['docs/m6-results.md', 'v1-results', 'Reference'],
+    ],
+    tutorials: [],
+  },
 };
 
 const get = async (url, as = 'text') => {

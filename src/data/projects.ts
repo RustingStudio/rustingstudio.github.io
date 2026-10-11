@@ -1,6 +1,6 @@
 // Copy and measured stats from design-system/components/bundle.js (PROJECTS).
-export type ProjectId = 'engine' | 'brain' | 'shader';
-export type Theme = 'copper' | 'verdigris' | 'cobalt';
+export type ProjectId = 'engine' | 'brain' | 'shader' | 'strata';
+export type Theme = 'copper' | 'verdigris' | 'cobalt' | 'amethyst';
 
 export interface Project {
   id: ProjectId; theme: Theme; scene: ProjectId; index: string;
@@ -62,9 +62,25 @@ export const PROJECTS: Record<ProjectId, Project> = {
     code: { lang: 'bash', title: 'install', text: '# 1. Install Iris for Minecraft Java Edition\n# 2. Download the latest RustingShader release\n$ mv RustingShader.zip ~/.minecraft/shaderpacks/\n# 3. Video Settings → Shader Packs → RustingShader', hl: [3] },
     repo: GH + 'RustingShader',
   },
+  strata: {
+    id: 'strata', theme: 'amethyst', scene: 'strata', index: '04',
+    name: 'RustingStrata', stem: 'Strata',
+    kicker: 'LLM inference / CUDA / Qwen',
+    short: 'A pure-Rust inference engine for Qwen3.5/3.6 MoE models that splits experts between GPU and CPU.',
+    lede: 'Run Qwen3.6-35B-A3B on a 12 GB GPU faster than llama.cpp. Experts that do not fit in VRAM run on the CPU alongside the GPU, and their placement adapts to the routing it sees. No C++, no ggml — CUDA kernels compile at run time.',
+    stats: [
+      { value: '2,093', label: 'tok/s prefill at 4K (llama.cpp: 1,017)' },
+      { value: '101', label: 'tok/s decode (llama.cpp: 65.8)' },
+      { value: '111', label: 'tok/s decode with MTP drafts' },
+    ],
+    statsFoot: 'Qwen3.6-35B-A3B Q2_K_XL (11.7 GiB) on an RTX 3060 12 GB + Ryzen 5 7600X.',
+    tags: ['Hybrid CPU/GPU MoE', 'Adaptive expert placement', 'MTP speculative decoding', 'OpenAI-compatible server'],
+    code: { lang: 'bash', title: 'run', text: '$ cargo build --release\n$ strata calibrate --model $M\n$ strata chat --model $M --gpu\n$ strata serve --model $M --gpu --addr 127.0.0.1:8080', hl: [3] },
+    repo: GH + 'RustingStrata',
+  },
 };
 
-export const IDS: ProjectId[] = ['engine', 'brain', 'shader'];
+export const IDS: ProjectId[] = ['engine', 'brain', 'shader', 'strata'];
 
 /** RustingScience: posts on the site, written in their own repository. Not a project, so no theme of its own. */
 export const SCIENCE = {

@@ -4,7 +4,7 @@ import StatRow from './StatRow.astro';
 import Tag from './Tag.astro';
 import Button from './Button.astro';
 import CodeBlock from './CodeBlock.astro';
-import { PROJECTS, u, type ProjectId } from '../data/projects';
+import { PROJECTS, IDS, u, type ProjectId } from '../data/projects';
 interface Props { project: ProjectId; align?: 'left' | 'right'; code?: boolean; still?: boolean; heading?: 'h1' | 'h2' }
 const { project, align, code = true, still, heading: H = 'h2' } = Astro.props;
 const pr = PROJECTS[project];
@@ -15,7 +15,7 @@ const right = align === 'right';
   <div class="gr-panel-shade"></div>
   <div class="gr-container gr-panel-inner">
     <div class="gr-panel-copy">
-      <div class="gr-panel-index"><b>{pr.index}</b> / 03</div>
+      <div class="gr-panel-index"><b>{pr.index}</b> / {String(IDS.length).padStart(2, '0')}</div>
       <span class="gr-kicker">{pr.kicker}</span>
       <H class="gr-panel-name">{pr.name.split(pr.stem)[0]}<b>{pr.stem}</b></H>
       <p class="gr-panel-lede">{pr.lede}</p>
