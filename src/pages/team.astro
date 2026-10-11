@@ -3,7 +3,12 @@ import Base from '../layouts/Base.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Icon from '../components/Icon.astro';
+import { u } from '../data/projects';
 import team from '../data/team.json';
+
+// avatar: a site path ("/team/x.jpg" in public/) or a full URL; without one, the GitHub avatar.
+const avatar = (m: { avatar?: string; github?: string }) =>
+  m.avatar ? (/^https?:/.test(m.avatar) ? m.avatar : u(m.avatar)) : m.github && `https://github.com/${m.github}.png?size=256`;
 ---
 <Base title="Team" description="The people who build RustingStudio.">
   <SiteHeader active="Team" />
@@ -14,6 +19,7 @@ import team from '../data/team.json';
       <div class="gr-cards">
         {team.map((m) => (
           <article class="gr-card gr-member">
+            {avatar(m) && <img src={avatar(m)} alt="" width="96" height="96" loading="lazy" />}
             <small>{m.status}</small>
             <b>{m.name}</b>
             {m.quote && <p>{m.quote}</p>}
