@@ -398,6 +398,9 @@ body { overflow-x: clip; }
 .gr-card b { font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 26px; color: var(--ink); }
 .gr-card p { margin: 0; font-size: 14px; line-height: 22px; color: var(--ink-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .gr-section-more { margin-top: var(--space-8); }
+.gr-member p { -webkit-line-clamp: unset; font-style: italic; color: var(--ink-soft); }
+.gr-member a { margin-top: auto; font-family: var(--font-mono); font-size: 13px; color: var(--accent); display: inline-flex; align-items: center; gap: var(--space-1); }
+.gr-member a svg { width: 14px; height: 14px; }
 .gr-empty { padding: var(--space-8); background: var(--surface-200); color: var(--ink-muted); }
 @media (max-width: 720px) { .gr-section { padding: var(--space-16) 0; } .gr-section-h { font-size: 30px; line-height: 36px; } .gr-404 h1 { font-size: 52px; } }
 @supports not (position-area: bottom) { #gr-switch { top: calc(var(--header-h) + 72px); left: var(--space-4); } }

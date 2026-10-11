@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Icon from '../components/Icon.astro';
+import team from '../data/team.json';
+---
+<Base title="Team" description="The people who build RustingStudio.">
+  <SiteHeader active="Team" />
+  <main id="main" class="gr-root gr-section" data-theme="copper">
+    <div class="gr-container">
+      <span class="gr-kicker">Team</span>
+      <h1 class="gr-section-h">The people behind RustingStudio</h1>
+      <div class="gr-cards">
+        {team.map((m) => (
+          <article class="gr-card gr-member">
+            <small>{m.status}</small>
+            <b>{m.name}</b>
+            {m.quote && <p>{m.quote}</p>}
+            {m.github && <a href={`https://github.com/${m.github}`}>@{m.github} <Icon name="arrowUpRight" /></a>}
+          </article>
+        ))}
+      </div>
+    </div>
+  </main>
+  <SiteFooter />
+</Base>
