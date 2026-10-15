@@ -5,7 +5,7 @@
 
 import { startBlackHole } from './blackhole';
 
-export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader' | 'strata';
+export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader' | 'strata' | 'rpu';
 export interface SceneOptions { still?: boolean; density?: number; focusX?: number; focusY?: number; fill?: number; seed?: number; interactive?: boolean }
 
 type RGB = number[];
@@ -466,7 +466,81 @@ function makeStrata(opt: SceneOptions): Draw {
   };
 }
 
-const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader, strata: makeStrata };
+/* -- rpu: an output-stationary systolic array. A operands flow in along the rows,
+   B along the columns, skewed one cycle a PE; each PE's pillar is its int32 sum,
+   growing for K cycles from the wavefront on. Then the rows shift out, one a cycle. */
+function makeRpu(): Draw {
+  const r = rng(53), N = 8, K = 16, GAP = 40, CELL = 28, STEP = 0.11;
+  const IDLE = 6, DRAIN = 2 * N - 2 + K, PERIOD = DRAIN + N + IDLE;
+  const sums = Array.from({ length: N * N }, () => 0.3 + r() * 0.7);
+  const at = (i: number, j: number): Vec => [(j - (N - 1) / 2) * GAP, 0, (i - (N - 1) / 2) * GAP];
+  return (ctx, t, W, H, col, par, opt) => {
+    const narrow = W < 760;
+    const cxp = W * (narrow ? 0.5 : (opt.focusX || 0.68)), cyp = H * (opt.focusY || 0.46);
+    const sc = Math.min(W * (narrow ? 1.2 : 0.9), H * 1.25) / 760, cam = 900, f = 800;
+    const yaw = 0.62 + Math.sin(t * 0.11) * 0.22 + par.x * 0.5, pitch = 0.62 + par.y * 0.2;
+    const P = (v: Vec) => { const q = rot(v, yaw, pitch); const z = q[2] + cam; return [cxp + q[0] * f / z * sc, cyp - q[1] * f / z * sc, z]; };
+    const p = (t / STEP) % PERIOD, cyc = Math.floor(p), shift = Math.max(0, cyc - DRAIN + 1);
+
+    const glow = ctx.createRadialGradient(cxp, cyp, 0, cxp, cyp, 360 * sc);
+    glow.addColorStop(0, rgba(col.accent, 0.14)); glow.addColorStop(1, rgba(col.accent, 0));
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+    // operand rails: A enters on the left of each row, B at the back of each column
+    ctx.lineWidth = 1;
+    for (let i = 0; i < N; i++) {
+      const a = P(at(i, -1.6)), b = P(at(i, N - 0.5)), c = P(at(-1.6, i)), d = P(at(N - 0.5, i));
+      ctx.strokeStyle = rgba(col.accent, 0.16);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.moveTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.stroke();
+    }
+
+    // PEs: k = cycles since the wavefront reached PE (i, j)
+    const cells: { faces: number[][][]; z: number; v: number; hot: number }[] = [];
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const src = i - shift, k = p - i - j;
+      let v = 0, hot = 0;
+      if (shift > 0) v = src >= 0 ? sums[src * N + j] : 0;
+      else if (k > 0) { v = sums[i * N + j] * Math.min(1, k / K); hot = k < K ? Math.max(0, 1 - k / 3) + 0.25 : 0; }
+      const [x, , z] = at(i, j), h = CELL / 2, y = 3 + v * 46;
+      const top = [[x - h, y, z - h], [x + h, y, z - h], [x + h, y, z + h], [x - h, y, z + h]].map(P);
+      const bot = [[x - h, 0, z - h], [x + h, 0, z - h], [x + h, 0, z + h], [x - h, 0, z + h]].map(P);
+      const sides = [0, 1, 2, 3].map((e) => [bot[e], bot[(e + 1) % 4], top[(e + 1) % 4], top[e]]);
+      sides.sort((A, B) => (B[0][2] + B[1][2]) - (A[0][2] + A[1][2]));
+      cells.push({ faces: [...sides, top], z: (top[0][2] + top[2][2]) / 2, v, hot: Math.min(1, hot) });
+    }
+    cells.sort((a, b) => b.z - a.z);
+    cells.forEach(({ faces, z, v, hot }) => {
+      const dz = Math.max(0, Math.min(1, (cam + 240 - z) / 480));
+      const c = mix(col.accent, col.hot, hot);
+      faces.forEach((pts, n) => {
+        ctx.beginPath(); pts.forEach((q, m) => (m ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath();
+        const lit = n === 4 ? 0.22 + v * 0.45 + dz * 0.2 : 0.12 + v * 0.2;
+        ctx.fillStyle = rgba(mix(col.bg, c, lit), 0.94); ctx.fill();
+        ctx.strokeStyle = rgba(c, 0.18 + dz * 0.25 + hot * 0.45); ctx.stroke();
+      });
+    });
+
+    // operand pulses travelling one PE a cycle, and the row leaving the array
+    ctx.globalCompositeOperation = 'lighter';
+    const fr = p - cyc;
+    const dot = (v: Vec, a: number, rad: number) => {
+      const q = P(v), g = ctx.createRadialGradient(q[0], q[1], 0, q[0], q[1], rad * sc);
+      g.addColorStop(0, rgba(col.hot, a)); g.addColorStop(1, rgba(col.hot, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q[0], q[1], rad * sc, 0, 6.283); ctx.fill();
+    };
+    if (shift === 0) for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const k = cyc - i - j;
+      if (k < 0 || k >= K) continue;
+      const fade = 0.5 * (1 - k / K) + 0.15;
+      dot([(j - 1 + fr - (N - 1) / 2) * GAP + GAP / 2, 60, (i - (N - 1) / 2) * GAP], fade, 9);
+      dot([(j - (N - 1) / 2) * GAP, 60, (i - 1 + fr - (N - 1) / 2) * GAP + GAP / 2], fade, 9);
+    }
+    if (shift > 0 && shift <= N) for (let j = 0; j < N; j++) dot([(j - (N - 1) / 2) * GAP, 20, (N - 0.5 + fr * 0.8 - (N - 1) / 2) * GAP], 0.6 * (1 - fr), 16);
+    ctx.globalCompositeOperation = 'source-over';
+  };
+}
+
+const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader, strata: makeStrata, rpu: makeRpu };
 
 export function startScene(canvas: HTMLCanvasElement, kind: SceneKind, opt: SceneOptions): () => void {
   // The black hole is the pack's own GLSL in WebGL; makeShader stays as the no-WebGL fallback.

@@ -7,7 +7,7 @@ const pages = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/pages' }),
   schema: z.object({
     title: z.string(),
-    project: z.enum(['engine', 'brain', 'shader', 'strata']),
+    project: z.enum(['engine', 'brain', 'shader', 'strata', 'rpu']),
     kind: z.enum(['docs', 'tutorials']),
     group: z.string(),
     order: z.number(),
@@ -25,7 +25,7 @@ const posts = defineCollection({
     date: z.coerce.date(),
     description: z.string(),
     tags: z.array(z.string()).default([]),
-    project: z.enum(['engine', 'brain', 'shader', 'strata']).optional(),
+    project: z.enum(['engine', 'brain', 'shader', 'strata', 'rpu']).optional(),
     minutes: z.number(),
     source: z.string().url(),
   }),

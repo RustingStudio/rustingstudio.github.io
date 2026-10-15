@@ -1,6 +1,6 @@
 // Copy and measured stats from design-system/components/bundle.js (PROJECTS).
-export type ProjectId = 'engine' | 'brain' | 'shader' | 'strata';
-export type Theme = 'copper' | 'verdigris' | 'cobalt' | 'amethyst';
+export type ProjectId = 'engine' | 'brain' | 'shader' | 'strata' | 'rpu';
+export type Theme = 'copper' | 'verdigris' | 'cobalt' | 'amethyst' | 'phosphor';
 
 export interface Project {
   id: ProjectId; theme: Theme; scene: ProjectId; index: string;
@@ -78,9 +78,25 @@ export const PROJECTS: Record<ProjectId, Project> = {
     code: { lang: 'bash', title: 'run', text: '$ cargo build --release\n$ strata calibrate --model $M\n$ strata chat --model $M --gpu\n$ strata serve --model $M --gpu --addr 127.0.0.1:8080', hl: [3] },
     repo: GH + 'RustingStrata',
   },
+  rpu: {
+    id: 'rpu', theme: 'phosphor', scene: 'rpu', index: '05',
+    name: 'RustingPU', stem: 'PU',
+    kicker: 'AI accelerator / SystemVerilog / Verilator',
+    short: 'An INT8 systolic-array accelerator in SystemVerilog, driven from Rust and checked bit for bit.',
+    lede: 'A complete AI accelerator, from the processing element to the DMA and the Rust driver. An N×N INT8 systolic array runs a RustingBrain network, and every result is checked bit for bit against a software reference. Simulated in Verilator today; a Tang Mega 60K FPGA is next.',
+    stats: [
+      { value: '97.25%', label: 'MNIST accuracy, equal to host int8' },
+      { value: '98.50%', label: 'Array utilization at 8×8' },
+      { value: '26.8', unit: 'cycles', label: 'Per MNIST image at 64×64' },
+    ],
+    statsFoot: '784-128-10 MLP, 10,000 test images, batch 64, in Verilator.',
+    tags: ['Output-stationary systolic array', 'On-chip requantization', 'GEMM sequencer', 'Bit-exact with the host'],
+    code: { lang: 'rust', title: 'src/main.rs', text: 'use rusting_pu::{quant, Rpu, TILE};\n\nlet mut rpu = Rpu::new()?;\nlet c = rpu.run_tile_i8(&a, &b)?;\nassert_eq!(c, quant::matmul_nt_i8(&a, &b, TILE, TILE, TILE));\nprintln!("{} cycles", rpu.cycles());', hl: [4] },
+    repo: GH + 'RustingPU',
+  },
 };
 
-export const IDS: ProjectId[] = ['engine', 'brain', 'shader', 'strata'];
+export const IDS: ProjectId[] = ['engine', 'brain', 'shader', 'strata', 'rpu'];
 
 /** RustingScience: posts on the site, written in their own repository. Not a project, so no theme of its own. */
 export const SCIENCE = {
