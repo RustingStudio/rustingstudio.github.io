@@ -107,14 +107,22 @@ body { margin: 0; background: var(--surface-100); color: var(--ink); font-family
 .gr-hero-lede { font-size: 16px; line-height: 26px; color: var(--ink-muted); margin: var(--space-3) 0 0; max-width: 480px; }
 .gr-hero-cta { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8); }
 .gr-hero-motto { margin-top: var(--space-12); font-family: var(--font-mono); font-size: 12px; letter-spacing: .18em; color: var(--ink-faint); }
-.gr-hero-index { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); padding-bottom: var(--space-8); }
-@media (max-width: 1100px) { .gr-hero-index { grid-template-columns: repeat(2, 1fr); } }
+.gr-hero-index { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--space-4); padding-bottom: var(--space-8); }
+/* Five tiles: three on the first row, two wider ones on the second. */
+.gr-hero-index > * { grid-column: span 2; }
+.gr-hero-index > :nth-child(n+4) { grid-column: span 3; }
+@media (max-width: 1100px) {
+  .gr-hero-index { grid-template-columns: repeat(2, 1fr); }
+  .gr-hero-index > *, .gr-hero-index > :nth-child(n+4) { grid-column: auto; }
+  .gr-hero-index > :last-child:nth-child(odd) { grid-column: span 2; }
+}
 @media (max-width: 900px) {
   .gr-hero { min-height: 0; }
   .gr-hero-title { font-size: clamp(40px, 13vw, 52px); }
   .gr-hero > .gr-scene { opacity: .4; }
   .gr-hero-shade { background: linear-gradient(0deg, var(--surface-100) 10%, rgba(22,25,29,.75) 60%, rgba(22,25,29,.35) 100%); }
   .gr-hero-index { grid-template-columns: 1fr; }
+  .gr-hero-index > :last-child:nth-child(odd) { grid-column: auto; }
 }
 
 /* ============ ProjectTile (hero index cards) ============ */

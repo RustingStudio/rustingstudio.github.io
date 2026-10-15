@@ -76,6 +76,17 @@ const MANIFEST = {
     ],
     tutorials: [],
   },
+  rpu: {
+    repo: 'RustingPU',
+    docs: [
+      ['README.md', 'index', 'Start', 'Overview'],
+      ['docs/engineering.md', 'engineering', 'Reference', 'Design'],
+      ['docs/perf-log.md', 'perf-log', 'Reference'],
+      ['docs/m1-results.md', 'm1-results', 'Reference'],
+      ['CHANGELOG.md', 'changelog', 'Reference'],
+    ],
+    tutorials: [],
+  },
 };
 
 const get = async (url, as = 'text') => {
