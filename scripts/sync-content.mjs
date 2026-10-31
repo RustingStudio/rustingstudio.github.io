@@ -1,10 +1,12 @@
 // Pulls docs and tutorials from the RustingStudio repositories on GitHub into
 // src/content/pages/, and RustingScience posts into src/content/posts/.
 // Run with `npm run sync-content`, then commit the result.
+// `npm run sync-content -- strata` syncs one project and skips RustingScience.
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ORG = 'RustingStudio';
+const ONLY = process.argv[2];
 const OUT = new URL('../src/content/pages/', import.meta.url);
 
 // [repo path, slug, group, title override?, extra frontmatter?]
@@ -72,6 +74,8 @@ const MANIFEST = {
     docs: [
       ['README.md', 'index', 'Start', 'Overview'],
       ['docs/baseline.md', 'baseline', 'Reference'],
+      ['docs/m2-results.md', 'm2-results', 'Reference'],
+      ['docs/m4-results.md', 'm4-results', 'Reference'],
       ['docs/m6-results.md', 'v1-results', 'Reference'],
     ],
     tutorials: [],
@@ -124,7 +128,7 @@ function convert(md, file, repo, routes, tree) {
   return parts.join('');
 }
 
-for (const [project, m] of Object.entries(MANIFEST)) {
+for (const [project, m] of Object.entries(MANIFEST).filter(([p]) => !ONLY || p === ONLY)) {
   const treeJson = await get(`https://api.github.com/repos/${ORG}/${m.repo}/git/trees/main?recursive=1`, 'json');
   const tree = new Set(treeJson.tree.map((t) => t.path));
   const routes = new Map();
@@ -148,6 +152,8 @@ for (const [project, m] of Object.entries(MANIFEST)) {
     }
   }
 }
+
+if (ONLY) process.exit(0);
 
 // RustingScience: every posts/<slug>/index.md becomes /science/<slug>/. Front matter passes through as written.
 const SCIENCE = 'RustingScience';
