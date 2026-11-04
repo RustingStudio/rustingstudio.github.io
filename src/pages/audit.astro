@@ -1,0 +1,123 @@
+---
+import Base from '../layouts/Base.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import StatRow from '../components/StatRow.astro';
+import Callout from '../components/Callout.astro';
+import Button from '../components/Button.astro';
+import { PROJECTS, GH } from '../data/projects';
+
+const CONTACT = 'mailto:rustingstudio@gmail.com?subject=LLM%20performance%20audit';
+const strata = PROJECTS.strata;
+
+const offers = [
+  {
+    tag: 'Audit', name: 'LLM performance audit', price: 'from €250',
+    text: 'One machine, one model, up to two backends (for example llama.cpp and RustingStrata). Decode, prefill, latency and memory, measured the same way for each. You get a written report with the numbers, the bottleneck, and the settings I would change.',
+  },
+  {
+    tag: 'Pilot', name: 'Optimization pilot', price: 'from €600',
+    text: 'One bottleneck from the audit, one bounded change: tuning, expert placement, a configuration or a code fix. Before and after numbers on your hardware, with the steps to reproduce them.',
+  },
+  {
+    tag: 'Custom', name: 'Rust / GPU engineering', price: 'scoped per project',
+    text: 'A specific kernel, an inference integration, or a performance component in Rust with CUDA or Vulkan. Fixed scope and milestones agreed in writing first.',
+  },
+];
+
+const steps = [
+  ['Tell me the setup', 'GPU, CPU, RAM, model file, and what "fast enough" means for your users.'],
+  ['Run one script', 'You run my benchmark script on your machine and send the output. No remote access needed.'],
+  ['Get the report', 'Measured numbers, what limits them, and concrete next steps. If llama.cpp already fits you best, the report says so.'],
+];
+---
+<Base title="LLM performance audit" description="Measured LLM inference performance on your GPU: decode, prefill, latency and memory, with a written report and concrete fixes.">
+  <SiteHeader active="Audit" />
+  <main id="main" class="gr-root" data-theme="copper">
+    <section class="gr-section audit-hero">
+      <div class="gr-container">
+        <span class="gr-kicker">Services</span>
+        <h1 class="gr-section-h">Make your local LLM faster, with numbers to prove it</h1>
+        <p class="audit-lede">
+          I measure how your model runs on your hardware, find what limits it, and tell you what to change.
+          For teams that run LLMs, especially MoE models, on consumer or workstation GPUs: local-first apps,
+          self-hosted assistants, on-premise deployments.
+        </p>
+        <Button href={CONTACT} arrow>Ask about an audit</Button>
+      </div>
+    </section>
+
+    <section class="gr-section">
+      <div class="gr-container">
+        <span class="gr-kicker">Offers</span>
+        <h2 class="gr-section-h">Three fixed scopes</h2>
+        <div class="gr-cards">
+          {offers.map((o) => (
+            <article class="gr-card audit-offer">
+              <small>{o.tag}</small>
+              <b>{o.name}</b>
+              <span class="audit-price">{o.price}</span>
+              <p>{o.text}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section class="gr-section">
+      <div class="gr-container">
+        <span class="gr-kicker">How it works</span>
+        <h2 class="gr-section-h">Three steps, no remote access</h2>
+        <ol class="gr-cards audit-steps">
+          {steps.map(([title, text], i) => (
+            <li class="gr-card audit-offer">
+              <small>Step {i + 1}</small>
+              <b>{title}</b>
+              <p>{text}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+
+    <section class="gr-section" data-theme={strata.theme}>
+      <div class="gr-container">
+        <span class="gr-kicker">Evidence</span>
+        <h2 class="gr-section-h">What this work looks like</h2>
+        <p class="audit-lede">
+          I build <a href={strata.repo}>RustingStrata</a>, a Rust inference engine for MoE models that splits experts
+          between GPU and CPU. On a 12 GB card it decodes Qwen3.6-35B-A3B about 1.7× faster than tuned llama.cpp.
+          Prefill is on par. Every number below is reproducible from the repository.
+        </p>
+        <StatRow stats={strata.stats} foot={strata.statsFoot} />
+      </div>
+    </section>
+
+    <section class="gr-section">
+      <div class="gr-container audit-narrow">
+        <span class="gr-kicker">Limits</span>
+        <h2 class="gr-section-h">What I do not promise</h2>
+        <Callout kind="note" title="Honest scope">
+          No guaranteed speedup before measuring. The focus is single-user and small-batch inference on one machine;
+          large multi-user serving on datacenter GPUs is vLLM or SGLang territory, and I will say so.
+          I work part-time next to school and reply within two to three days.
+        </Callout>
+        <p class="audit-lede">
+          Vasyl Trefilov, author of <a href={strata.repo}>RustingStrata</a> and other projects
+          on <a href={GH.replace(/\/$/, '')}>GitHub</a>.
+        </p>
+        <Button href={CONTACT} arrow>Ask about an audit</Button>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .audit-lede { max-width: 68ch; margin: 0 0 var(--space-8); font-size: 17px; line-height: 28px; color: var(--ink-soft); }
+  .audit-lede a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .audit-price { font-family: var(--font-mono); font-size: 14px; color: var(--ink); }
+  .audit-offer p { -webkit-line-clamp: unset; }
+  .audit-steps { list-style: none; padding: 0; margin: 0; }
+  .audit-narrow :global(.gr-callout) { margin-bottom: var(--space-8); }
+</style>
