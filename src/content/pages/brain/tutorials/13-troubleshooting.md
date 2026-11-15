@@ -28,10 +28,7 @@ start changing things.
 Almost every problem announces itself in the loss curve, and the shape tells
 you which problem it is.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/loss_shapes_dark.svg">
-  <img src="figures/loss_shapes_light.svg" alt="Loss curve shapes: healthy, flat, NaN, overfitting, unstable">
-</picture>
+![Loss curve shapes: healthy, flat, NaN, overfitting, unstable](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/loss_shapes_dark.svg)
 
 So: print it. Every time, in every run.
 

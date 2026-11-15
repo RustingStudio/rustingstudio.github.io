@@ -150,6 +150,13 @@ function convert(md, file, repo, routes, tree) {
   for (let i = 0; i < parts.length; i += 2) {
     parts[i] = parts[i]
       .replace(/<!--[\s\S]*?-->\n?/g, '')
+      // <picture>/<img> figures become markdown images; the site is dark only, so take the dark source.
+      .replace(/<picture>[\s\S]*?<\/picture>|<img\b[^>]*>/g, (html) => {
+        const src = html.match(/<source[^>]*prefers-color-scheme:\s*dark[^>]*srcset="([^"\s]+)"/)?.[1]
+          ?? html.match(/<source[^>]*srcset="([^"\s]+)"[^>]*prefers-color-scheme:\s*dark/)?.[1]
+          ?? html.match(/<img[^>]*\ssrc="([^"]+)"/)?.[1];
+        return src ? `![${html.match(/\salt="([^"]*)"/)?.[1] ?? ''}](${src})` : html;
+      })
       .replace(/(!?)\[([^\]]*)\]\(([^)\s]+)\)/g, (all, bang, text, target) => {
         if (/^[a-z]+:|^#|^mailto:/i.test(target)) return all;
         const [p, hash = ''] = target.split('#');

@@ -38,10 +38,7 @@ Four examples. That's the entire dataset.
 
 Draw the four points, filled for output 1, hollow for output 0:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/xor_dark.svg">
-  <img src="figures/xor_light.svg" alt="The four XOR points: opposite corners share an output">
-</picture>
+![The four XOR points: opposite corners share an output](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/xor_dark.svg)
 
 Now try to separate the filled dots from the hollow dots with **one straight
 line**. Go on, try. Any line you draw gets at least one point wrong. The two

@@ -168,10 +168,7 @@ attention.
 
 Eight of these, in a row:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/transformer_block_dark.svg">
-  <img src="figures/transformer_block_light.svg" alt="A transformer block: RMSNorm, attention, residual, RMSNorm, SwiGLU, residual">
-</picture>
+![A transformer block: RMSNorm, attention, residual, RMSNorm, SwiGLU, residual](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/transformer_block_dark.svg)
 
 **RMSNorm** rescales each vector to a consistent magnitude so the next layer
 sees inputs in a predictable range. It is LayerNorm without the mean

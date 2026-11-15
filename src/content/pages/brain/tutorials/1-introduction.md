@@ -117,10 +117,7 @@ its own private set of weights and its own bias. That row of neurons is a
 
 Here is a layer of 3 neurons reading 2 inputs:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/layer_dark.svg">
-  <img src="figures/layer_light.svg" alt="A layer of three neurons, each reading both inputs">
-</picture>
+![A layer of three neurons, each reading both inputs](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/layer_dark.svg)
 
 Every input connects to every neuron. That is what **dense** (or
 "fully connected") means, and it is the only layer type a `Network` has — the
@@ -137,10 +134,7 @@ Counting parameters is easy: each of the 3 neurons has 2 weights and 1 bias, so
 
 Then you **stack** layers. The outputs of layer 1 become the inputs of layer 2:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/network_dark.svg">
-  <img src="figures/network_light.svg" alt="Two inputs feed three neurons, which feed one output neuron">
-</picture>
+![Two inputs feed three neurons, which feed one output neuron](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/network_dark.svg)
 
 - The first thing on the left is the **input layer**. It isn't really a layer —
   it's just your data. It has no weights.
@@ -180,10 +174,7 @@ RustingBrain gives you five:
 
 ### `Relu` — `max(0, z)`
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/relu_dark.svg">
-  <img src="figures/relu_light.svg" alt="ReLU: zero for negative z, slope one for positive z">
-</picture>
+![ReLU: zero for negative z, slope one for positive z](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/relu_dark.svg)
 
 Negative in, zero out. Positive in, unchanged out. It is stupidly simple, very
 fast, and it is the default choice for hidden layers. Use this unless you have a
@@ -196,10 +187,7 @@ the usual cure.
 
 ### `Sigmoid` — squashes everything into `(0, 1)`
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/sigmoid_dark.svg">
-  <img src="figures/sigmoid_light.svg" alt="Sigmoid: an S-curve from 0 to 1">
-</picture>
+![Sigmoid: an S-curve from 0 to 1](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/sigmoid_dark.svg)
 
 Any input, no matter how large, comes out between 0 and 1. That makes it
 perfect for the **output** neuron when you want a probability: "70% chance this
@@ -210,10 +198,7 @@ zero, so learning nearly stops. Don't use it in hidden layers of deep networks.
 
 ### `Tanh` — squashes into `(-1, 1)`
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/tanh_dark.svg">
-  <img src="figures/tanh_light.svg" alt="Tanh: an S-curve from -1 to 1, centred on zero">
-</picture>
+![Tanh: an S-curve from -1 to 1, centred on zero](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/tanh_dark.svg)
 
 Same S-shape as sigmoid but centred on zero. Because its outputs average out to
 around 0 rather than 0.5, it usually trains a bit better than sigmoid in hidden
@@ -352,10 +337,7 @@ new_w = old_w − learning_rate × gradient
 The **learning rate** is your step size, and it's the single most important
 setting you'll choose:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/learning_rate_dark.svg">
-  <img src="figures/learning_rate_light.svg" alt="Gradient descent with a learning rate that is too small, right, and too big">
-</picture>
+![Gradient descent with a learning rate that is too small, right, and too big](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/learning_rate_dark.svg)
 
 Typical values are `0.001` to `0.1`. If your loss barely moves, raise it. If
 your loss jumps around or becomes `NaN`, lower it.
@@ -490,10 +472,7 @@ from -0.13 toward the target of 1.0.
 That is the entire mechanism. Everything else in machine learning is this loop,
 run millions of times over thousands of examples:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/training_loop_dark.svg">
-  <img src="figures/training_loop_light.svg" alt="Forward pass, loss, backward pass, update, repeated">
-</picture>
+![Forward pass, loss, backward pass, update, repeated](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/training_loop_dark.svg)
 
 > **A note on RustingBrain's internals, so the source doesn't confuse you.**
 > The library tracks `target − prediction` instead of `prediction − target`,
@@ -564,10 +543,7 @@ data back:
 
 The tell-tale sign, which you'll see for real in chapter 7:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="figures/overfitting_dark.svg">
-  <img src="figures/overfitting_light.svg" alt="Training loss keeps falling while validation loss turns back up">
-</picture>
+![Training loss keeps falling while validation loss turns back up](https://raw.githubusercontent.com/RustingStudio/RustingBrain/main/tutorials/figures/overfitting_dark.svg)
 
 Training loss falling while validation loss rises = you are overfitting. Stop
 training, or use a smaller model, or get more data.
