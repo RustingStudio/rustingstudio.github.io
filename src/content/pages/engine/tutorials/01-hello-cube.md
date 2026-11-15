@@ -78,7 +78,7 @@ The cube spins and moves up and down once every π seconds.
 1. Press the add button (`+`, "Add object") at the top of the Hierarchy,
    open `Meshes`, and choose `Sphere`.
 2. Rename it to `Moon` (double-click the row, or `F2`).
-3. With the Moon selected, hover the Scene View, press `R` then `X`, and
+3. With the Moon selected, hover the Scene View, press `G` then `X`, and
    move the mouse to slide it along X. Left-click to confirm; right-click or
    `Escape` cancels.
 4. Save the scene with `Ctrl+S`.

@@ -3,11 +3,717 @@ title: "Changelog"
 project: "brain"
 kind: "docs"
 group: "Reference"
-order: 4
-description: "Everything here is additive except the seams around ImagePipeline: ImagePipeline::new takes a PromptEncoder in place of a tokenizer and an encoder and an ImageDenoiser in place of a Dit (a Dit converts into one, so passing one still compiles), the pipeline's tokenizer and encoder fields are now the one encoder field, its denoiser field is an ImageDenoiser, PipelineConfig has gained betas and solver fields, SamplingConfig has gained a solver field, and PromptEncoder::encode hands back the pooled vector alongside the states in place of the separate pool."
+order: 5
+description: "A major version: the image pipeline's public types gained fields and variants. Code written for 4.0.0 needs these changes:"
 source: "https://github.com/RustingStudio/RustingBrain/blob/main/CHANGELOG.md"
 ---
-## Unreleased
+## 5.0.0
+
+A major version: the image pipeline's public types gained fields and variants.
+Code written for 4.0.0 needs these changes:
+
+- `DynamicShift::empirical` and `VaeConfig::batch_norm_eps` are new fields.
+  Name them in a struct literal, or start from the type's default.
+- `DynamicShift::shift` takes the step count as a second argument.
+- `PromptEncoder::Sequence` has a new `chat` field. Add `..` to a pattern that
+  matches it.
+- `Precision::Fp8` and `ImageDenoiser::ZImage` are new variants. Add an arm to
+  an exhaustive `match`.
+
+- Z-Image-Turbo text-to-image (RustingFrame Z1). `zimage::ZImage` is the
+  single-stream DiT: noise and caption refiners, 3D RoPE 32/48/48, qk norm.
+  It runs Q8 on the host and on the device. `ImagePipeline::load_at` picks
+  it when `model_index.json` names `ZImagePipeline`. The sampler is
+  flow-match Euler at shift 3, 8 steps, no CFG. The Qwen3-4B encoder is
+  klein's code with `ChatPrompt::z_image`: the state after 35 layers, real
+  tokens only. Its weights equal klein's in every layer that runs. Only the
+  MLP of layer 35 (the 36th) differs, and the loader never reads it.
+  The FLUX.1 decoder's mid attention scores reach 2e7, which FP16 cannot
+  hold. On the first FP16 overflow, the device decoder switches for good to
+  F32 scores and a softmax with FP16 output (`softmax_wide`). klein never
+  overflows, so its path stays bit for bit the same
+  (`flux2_klein_matches_diffusers` with `RB_FLUX2_W8A8=0`: 8.727e-3 /
+  3.313e-2 / 3.028e-2, unchanged).
+  `zimage::tests::z_image_turbo_matches_diffusers` runs the lighthouse at
+  1024², 8 steps, seed 7, on the device. The reference is diffusers 0.42.1
+  in F32 on the CPU (RustingFrame `tools/zimage_refs.py`). Results:
+  encoder F32 2.96e-6, encoder Q8 1.07e-2, sigmas exact, step-0 1.51e-2,
+  final latent 9.08e-2, image 8.63e-2. The decoder alone on the reference
+  latent gives 1.02e-3. Q8 weight error misses the plan gates (1e-2 / 1e-2
+  / 3e-2 / 3e-2); it is not a bug. F32 activations change nothing
+  (1.78e-2 / 8.96e-2). Q8 group 16 gives 1.15e-2 / 6.61e-2. The picture
+  matches diffusers by eye.
+  Through RustingFrame on the 3060, a warm 1024² job takes 21.95 s
+  (21.92-21.97, 3 runs under the lock). Peak VRAM is 11866 MiB on the
+  whole GPU, desktop included. The encoder does not fit beside the DiT on
+  12 GB, so it runs on the host: about 1.8 s for each new prompt.
+
+- W8A8 is now the default for FLUX.2-klein on compute capability 8.0+
+  (owner, 2026-11-03); `RB_FLUX2_W8A8=0` turns it off. Other DiT layouts
+  (FLUX.1) keep the dequantize-then-cuBLAS path. `flux2_klein_matches_diffusers`
+  with `RB_FLUX2_W8A8=0` is unchanged (step-0 8.727e-3, final latent
+  3.313e-2, image 3.028e-2, strict gates); by default it runs W8A8 (1.114e-2,
+  4.935e-2, 4.154e-2) against W8A8's own gates 0.0125 / 0.055 / 0.046, the
+  measured numbers plus about 12 %.
+- W8A8 for FLUX.2-klein's block linears (RustingFrame P5), opt-in with
+  `RB_FLUX2_W8A8=1` on compute capability 8.0+: `cuda_w8a8` quantizes BF16
+  activations to int8 per token per 64 columns and multiplies them with the
+  Q8 weights on the int8 tensor cores (`mma.sync` m16n8k32 s8), FP32 out.
+  The default path is unchanged. On the 3060, 1024x1024 denoise 6.91 s to
+  4.98 s (28 % less), 512x512 2.35 s to 1.53 s; klein against diffusers
+  with the switch: step-0 1.11e-2, final latent 4.94e-2, image 4.15e-2, over
+  the image gate (0.034), which the owner waived for this path.
+- An FP8 GEMM for sm_89 and later (RustingFrame X3a), off by default:
+  `cuda_fp8` runs `y = x . W^T + beta * y` for an X1 FP8 weight with `x`
+  quantized to E4M3 per row on the fly (`quantize_rows_e4m3`, bit for bit the
+  host encoder), on `mma.sync.aligned.m16n8k32.row.col.f32.e4m3.e4m3.f32`,
+  FP32 accumulation, both scales in the epilogue, FP32 output as the existing
+  linear path. It loads only on compute capability 8.9+ with
+  `RUSTING_BRAIN_FP8_MMA` set; every other device keeps the widen-then-cuBLAS
+  path. Host math: `Quantized::matmul_fp8_activations`. NVRTC 13.4 builds it
+  for compute_89 and compute_120 PTX and through ptxas to sm_89 SASS (56
+  registers) and sm_120 SASS (62 registers), no spills, 6144 B shared; sm_86
+  rejects the instruction, and the 3060 does not compile or load it.
+  On the 3060 the activation quantizer matches the host bit for bit, the lib
+  suite passes (704, the known detection failure, 32 ignored) and klein
+  parity is unchanged (step-0 8.727e-3, image 3.028e-2). Estimate of full
+  FP8 math on klein (test-only `RB_TEST_FP8_ACTIVATIONS`: activations through
+  E4M3 per row and back, then the BF16 path, device, lighthouse seed 0):
+  step-0 3.935e-2, final latent 2.083e-1, image 8.693e-2, against weight-only
+  FP8's 3.10e-2 / 1.617e-1 / 6.925e-2, so per-row FP8 math is further off
+  the image gate (0.034) than X1.
+  The kernel's results on sm_89 and sm_120 are UNVERIFIED: no such card has
+  run `gpu_model::tests::the_fp8_gemm_matches_the_host_reference_on_sm_89_or_skips`
+  (ignored, needs sm_89+).
+- Every NVRTC kernel now compiles for the device's own virtual architecture:
+  the newest one the loaded NVRTC reports that is not above the oldest
+  visible device (compute_86 on a 3060, compute_89 on an sm_89 card,
+  compute_120 on an RTX 50; with NVRTC 13.4 an unknown newer card gets
+  compute_121, which the driver JIT-compiles forward). Before,
+  only the fused attention kernels named a target (compute_80, still their
+  floor); the rest used NVRTC's default. A device older than NVRTC's list or
+  a failed query keeps the default. 3060: lib suite 700 passed with the
+  known detection failure, and FLUX.2-klein (step-0 8.73e-3, image 3.03e-2)
+  and Wan DiT/VAE device parity are unchanged. The sm_89 and sm_120 targets
+  are UNVERIFIED: no such card has run them.
+- FLUX.2-klein's transformer can store its block linears as FP8 E4M3, with one
+  scale per row: `Precision::Fp8` (opt-in; Q8 stays the default). This adds a
+  variant to `Precision`, so an exhaustive `match` on it outside the crate
+  breaks, and RustingFrame needs its own "fp8" value to reach it. Only the
+  FLUX-family `Dit` uses it. Modulations stay int8 per row, embedders and
+  proj_out stay F32, other models load it as Q8 or F32, and `save_bin`
+  refuses it. On the device a `dequantize_fp8` kernel widens the bytes to
+  BF16 for the existing GEMM (sm_86; the native FP8 GEMM on sm_89+ is
+  UNVERIFIED and not used). Parity is worse than Q8 and misses the image gate:
+  lighthouse seed 0 on the device, step-0 3.10e-2 against 8.73e-3, whole-chain
+  image 6.93e-2 against 3.03e-2 (gate 0.034). The host gives the same numbers.
+  3060, 1024x1024, 4 steps, 3 interleaved runs, load 1.7-5.8: denoise 6.77 s
+  against 6.82 s, upload 7.0 s against 12.5 s, process peak 9186 against
+  10626 MiB.
+- Wan 2.2 TI2V-5B image-to-video at 1280x704x121 now fits on a 12 GB card.
+  Above 12288 tokens the device DiT runs the QKV projection and the
+  feed-forward 4096 tokens at a time, so their FP32 `[tokens, 3 * dim]` and
+  `[tokens, 14336]` buffers no longer scale with the clip (121 frames failed
+  allocating 746 MiB with 94 MiB free). 1280x704x49 and below run the same
+  code as before and print the same parity numbers. 3060, UniPC 20 steps,
+  CFG 5, release test build without LTO: 121 frames sample in 1146.7 s, peak
+  10748 MiB (desktop included); 81 frames peak 10994 to 10164 MiB with the
+  same decoded frames.
+- Wan 2.2 TI2V-5B image-to-video at 1280x704x49 now fits on a 12 GB card.
+  The device DiT's per-block temporaries were shadowed, not dropped, so they
+  all sat under the feed-forward's two FP32 `[tokens, 14336]` buffers (626 MiB
+  each at 49 frames; one of them was the failed allocation). They now drop when
+  their stage ends, the attention scratch is allocated once per call, and the
+  feed-forward's bias and GELU run in one kernel. Activation peak at 49 frames
+  goes from about 2.7 GB to 1.1 GB. Output is unchanged: the parity tests print
+  the same numbers. 3060, 1280x704x33, UniPC 20 steps, CFG 5, release test
+  build without LTO, 2 interleaved runs each, load 1.2-2.4: whole-process peak
+  (desktop included) 11061/10877 to 9885/9723 MiB, sampling 227.1/226.5 s to
+  221.0/215.1 s. 1280x704x49 went from out of memory before step 0 to 335.7 s
+  of sampling plus a working decode, peak 10086 MiB.
+- Wan 2.2 TI2V-5B image-to-video on the UniPC + CFG path can skip steps:
+  `VideoConfig::skip = Some(StepSkip { full: 4, every: 2 })` runs the first 4
+  steps in full, then skips both DiT passes on every second step but the last
+  and gives UniPC the previous guided velocity; default `None`, bit-identical.
+  1280x704x17, 20 steps, seed 7, guidance 5, 3060: 40 to 26 DiT calls, 111.6 s
+  (3 runs, spread 0.2 s) to 74.7 s (3 runs, spread 4.6 s), 33 % less; latent
+  relative L2 to the 20-step run 0.224, against 0.426 for 13 plain steps (26
+  calls, 73.3 s). At 49 frames 329.5 s to 215.8 s, 0.176. Test
+  `wan22_image_to_video_step_skip_sweep` (ignored, `RB_WAN_CUDA=1`,
+  `RB_WS3_IMAGE`).
+- Q8 denoiser projections carry one int8 scale per 64 columns instead of one
+  per row (`RB_Q8_GROUP`, 0 restores the old layout; the modulations stay per
+  row), and the input/time embeddings and output projection stay F32. FLUX.2-klein
+  step-0 against diffusers: 0.0127 to 0.0068 host, 0.0141 to 0.0087 device
+  (0.0226 to 0.0139 with a reference image); 1024x1024 denoise 6.24 s to 6.37 s,
+  peak VRAM 10434 to 10626 MiB.
+- FLUX.2-klein reference-image conditioning (image editing):
+  `ImagePipeline::set_references(&[FeatureMap])` and
+  `generate_with_references(prompt, width, height, seed, &references, on_step)`
+  encode each reference with the pipeline's VAE encoder and append its tokens
+  (ids `10 + 10 i` on the time axis) to the image tokens, host and device;
+  without references nothing changes. 512x512 edit, 4 steps, Q8 on the 3060:
+  3.92 s warm; image 0.0112 against diffusers. Example `image_edit`.
+- Wan VAE device decode gathers each frame's convolution columns once for all
+  three temporal taps (the layers keep partial sums of the next outputs
+  instead of the last two input frames) and skips the zero-bias epilogue on
+  the older taps: 1280x704x17 decodes 7.4 % faster (11.04 s to 10.22 s in a
+  debug test build) with a lower peak (5.4 against 5.9 GB). Relative L2 to
+  diffusers 1.13e-3 (was 1.29e-3), to the previous decode 1.6e-3.
+- Wan 2.2 TI2V-5B gets FastWan's 3-step DMD sampler (`VideoConfig::dmd =
+  Some(Dmd { timesteps: vec![1000, 757, 522], seed })`, `dmd_sigmas`; no
+  guidance, one DiT call a step) and `VideoPipeline::set_dit_weights` for a
+  single-file DiT. 1280x704x49 samples in about 21 s, against a 450-500 s
+  30-step CFG run; default sampling unchanged.
+- The Wan 2.2 device VAE decoder takes the blocks after the last one that adds
+  frames one frame at a time instead of four, output bit-identical: the
+  704x1280x17 decode peaks at 5856 MiB of device memory instead of 6784 MiB, in
+  the same 9.5 s. `make_room` uses the new fit (650 MiB + 5.0e-3 MiB a pixel);
+  the DiT still goes at 12 GB (3.5 GB free beside it against 5.7 GB needed)
+  and is estimated to stay on a 16 GB card (not measured).
+- Wan 2.2's video pipeline: `video_pipeline::VideoPipeline` turns a prompt,
+  and optionally a first frame, into RGB video with umT5, the Wan DiT under
+  classifier-free guidance and the Wan VAE, sampled with `UniPc`, diffusers'
+  UniPC scheduler as Wan configures it (exact schedule, a bit-exact replay of
+  the reference trajectory). Requests are checked (frames 4k+1, sides a
+  multiple of 32). On an RTX 3060: a 256x256x5 clip in 6 steps takes 2.2 s,
+  a 704x1280x17 step 4.5-5.4 s; umT5 stays on the host and the DiT is
+  dropped before a decode that does not fit beside it (`docs/measurements.md`,
+  W4).
+- Wan 2.2's video transformer: `wan_dit::WanDit` runs one denoiser call of
+  the TI2V-5B DiT (a timestep per frame, so the first frame of an
+  image-conditioned clip can sit at t = 0), matching diffusers'
+  `WanTransformer3DModel` in F32 (output relative L2 2.3e-5) and 3.3e-2 at
+  Q8. `WanDit::attach_device` runs it on the GPU (int8 weights, BF16
+  operands, FP32 residual): 4.4e-2 against diffusers, 704x1280x17 in
+  2.3-2.6 s a step and about 7.7 GB on an RTX 3060 (`docs/measurements.md`, W3).
+  A malformed checkpoint is refused with `InvalidConfig` before any upload.
+- Wan 2.2's video autoencoder: `wan_vae::WanVaeDecoder` decodes a latent
+  (one map per latent frame) into RGB frames and `WanVaeEncoder` encodes a
+  `1 + 4k`-frame clip, both matching diffusers' `AutoencoderKLWan` in F32
+  (relative L2 under 1e-6). `WanVaeDecoder::attach_device` decodes on the GPU
+  in FP16 (1.3e-3): 704x1280x17 in 9.5 s and 7.8 GB on an RTX 3060, untiled
+  (`docs/measurements.md`, W2).
+- umT5, Wan 2.2's prompt encoder, runs through `T5Encoder`: a checkpoint with
+  a position table in every block is read that way (T5's single shared table
+  is unchanged), on the host and the device. `T5Encoder::encode_real` gives
+  the states Wan hands its denoiser: the real tokens only, zero rows after
+  them. umT5-XXL at Q8 against transformers: token ids exact, prompt
+  embeddings 0.0203 / 0.0245 on the host, 0.0204 / 0.0245 on an RTX 3060
+  (95 / 194 ms for 9 / 39 tokens; `docs/measurements.md`, W1).
+- `ImagePipeline::encoder_on_device` says whether `to_cuda` (or `try_cuda`)
+  moved a sequence prompt encoder such as FLUX.2-klein's Qwen3. That upload
+  may fail when VRAM is short and the encoder then stays on the host (prompt
+  encode about 12 s instead of 0.7 s on an RTX 3060); before, nothing said so.
+- FLUX.2-klein-4B denoises faster on the device: 1024x1024 Q8 on an RTX 3060
+  9.96 s to 6.61 s for 4 steps (2.49 to 1.65 s a step), parity against
+  diffusers unchanged (`docs/measurements.md`, P2). The per-head norm and
+  rotation runs one warp per head, flash attention streams K and V with
+  `cp.async` (also faster for the LM shapes: 0.557 to 0.398 ms at 4x1024,
+  head 64), and the MLP activation writes BF16 straight from the fused GEMM.
+  `examples/flash_probe` now compares kernel source files.
+- `vae::png_bytes` (`images` feature) encodes a decoded image to PNG in
+  memory, the same bytes `save_png` writes.
+- `ImagePipeline::to_cuda` (and `try_cuda`) moves a sequence prompt encoder
+  such as FLUX.2-klein's Qwen3 to the device as well: 1024x1024 Q8 prompt
+  encode 12.4 s to 0.7 s on an RTX 3060, embeddings 0.0249 against diffusers
+  (host Q8 0.0251), peak VRAM 6754 to 10402 MiB (`docs/measurements.md`, P1).
+  New: `TextEncoder::attach_device`, `on_device`, `detach_device` and the
+  `cuda_text_encoder` module.
+- FLUX.2-klein loads and runs through `ImagePipeline`, checked stage by stage
+  against diffusers (`docs/measurements.md`, K14). New public items:
+  `ChatPrompt`, `ImagePipeline::sample_latent_from_noise`, `TextEncoder::forward_layers`,
+  `VaeDecoder::patch_norm`. A diffusers-layout DiT loaded at Q8 no longer
+  panics. Breaking for code that names these: `DynamicShift` gains
+  `empirical` and `DynamicShift::shift` takes the step count,
+  `PromptEncoder::Sequence` gains `chat` (`None` keeps the old behaviour), and
+  `VaeConfig` gains `batch_norm_eps`.
+
+## 4.0.0
+
+A major version because 3.0.1 broke the 3.0.0 API in a patch release; 3.0.1 is
+yanked and its changes are released here. Code written for 3.0.0 needs these
+changes:
+
+- `AgentConfig::causal` is a new field (`None` keeps the old MLP trunk). Build
+  from `AgentConfig::new` and set fields, or name the field in a literal.
+- `ClipTextConfig::argmax_pool` is a new field (`ClipTextConfig::default()`
+  sets `true`). Name it, or use `..Default::default()`.
+- `QNetwork::trunk` is now a `Trunk` (`Trunk::Mlp` holds the old
+  `MarketTrunk`), and `ForwardCache::trunk` is a `TrunkState`
+  (`TrunkState::Mlp` holds the old `TrunkCache`). Read the trunk's output
+  through `TrunkState::h()`.
+- The minimum Rust version is 1.88, up from 1.85. The `cuda` feature already
+  needed 1.88 through `cudarc`'s `libloading` dependency.
+
+### Changed
+
+- `Dataset::shuffle` moves rows instead of cloning them: 200,000 rows of 64 features shuffle in about 5 ms instead of 31 ms, with no second copy of the data held (R4, RustingTrade P08). Same order for the same seed.
+- `Param::step` (and so every `TransformerLm`, flow and image model step, on CPU and CUDA) no longer applies weight decay to one-row parameters: biases and norm gains keep their value, and matrices decay as before (R2, asked by RustingLLM). `Network` already skipped its biases. A rank-1 LoRA `down` matrix is one row too and is no longer decayed.
+- `marching_tetrahedra` and `marching_tetrahedra_sparse` now wind every face outward, from the field's inside (below the isovalue) to its outside (K11). Before, the winding followed the tetrahedron table and could point either way.
+- `TrainableConv2d::to_cuda_on` moves the bias to the device as well; the host-input `forward`/`backward` now run through the device-resident pair, so the bias add and its gradient no longer happen on the host. `bias.value`/`bias.grad` are stale until `to_cpu`, as for the weight.
+- `Param::step` (and so `apply_step` and `step_clipped`) panics on step 0 instead of turning every parameter NaN through Adam's bias correction; steps count from 1 (asked by RustingChop). An assert rather than an error, as the consumer allowed: the signatures stay the same.
+- A device decoder under mixed precision keeps its cache as BF16 keys and
+  values, 512 bytes a position a layer on the default model instead of
+  3072, and later turns read it in place through the flash kernel. 16
+  sequences after a 2000-token prompt decode 7040 to 7360 tokens/s, and
+  over 8 steps 2.89 to 2.30 ms a step; one sequence is unchanged.
+- A device decoder's first prompt runs the fused flash attention kernel
+  under mixed precision at head widths 64 and 128, instead of a full score
+  matrix a head: 16 prompts of 2000 tokens prefill in 149 ms instead of
+  364 ms, and with every other prompt half as long in 125 ms instead of
+  438 ms. `bench_decode` prints the prefill time.
+- A device decoder's later turns of 128 tokens or more take the same flash
+  kernel: 16 sequences feeding 512 tokens after 2000 run 140 to 60 ms.
+  `bench_decode` takes a sixth argument, the length of a timed second turn.
+- Device decode attention runs one block per key-value head, scoring every
+  query head of its group against each cached key and value it loads,
+  instead of one block per query head. On the default model (8 heads over
+  2 key-value heads) 16 sequences after a 2000-token prompt decode 5016 to
+  6906 tokens/s, and one int8 sequence after 4000 tokens 1205 to 1430.
+- A decoder's device KV cache grows with the session, doubling up to
+  `max_seq_len`, instead of taking `max_seq_len` positions per sequence when
+  it is made. Forks copy only what the session holds room for.
+- Stride-1 convolutions on the image path gather only their horizontal taps
+  and run one accumulating GEMM per kernel row, instead of an im2col nine
+  times the input: the SDXL VAE decode at 1024x1024 runs 0.52 to 0.49 s.
+- Device cross-attention (the shape VAE and the flow transformer) runs in
+  BF16 through the fused flash kernels under mixed precision with heads 64 or
+  128 wide, instead of FP32 around a score matrix. The shape VAE's training
+  step runs 0.084-0.087 to 0.062-0.065 s (-25%).
+- The device memory pool keeps the memory a training step frees instead of
+  returning it to the driver at every synchronization. The shape VAE's
+  training step runs 0.130 to 0.085 s (-35%); the language-model step is
+  unchanged.
+- The fused attention query-gradient kernel at head width 128 uses 34 KiB
+  of shared memory instead of 52 KiB, so two blocks fit per SM: a training
+  step with heads of 128 runs about 2.6% faster.
+- `GpuContext` runs on the CUDA default stream, so cudarc no longer records
+  and waits on an event for every kernel argument. Batch-1 int8 decode gains
+  about 2% (1676-1712 to 1711-1747 tokens/s); training is unchanged.
+- Device decode attention issues its cache loads in parallel: 16 sequences
+  after a 512-token prompt decode 7780-7980 to 8731-8835 tokens/s.
+- Int8 device decode runs the routed experts with an int8 routed GEMV instead
+  of downloading the routing each MoE layer: one sequence of the default model
+  decodes 1014-1049 to 1535-1613 tokens/s.
+- `ImagePipeline::to_cuda` also moves a transformer denoiser and a gated T5
+  encoder, so FLUX and Stable Diffusion 3 pipelines run on the device. Both
+  use the BF16 kernels; the original ungated T5 stays on the host.
+- Device decode of up to 16 sequences routes its mixture-of-experts layers
+  on the device instead of copying the routing back to the host each layer:
+  one sequence of the default model decodes about 1.5x faster (about 900 to
+  1360 tokens per second), four 1.4x, sixteen 1.14x.
+- The fused attention backward pass's key/value kernel reads its query and
+  output-gradient tiles transposed with `ldmatrix` instead of keeping a
+  second copy, which halves its shared memory and fits three blocks on an
+  SM: 25% less time in that kernel, about 1% more training tokens per
+  second on the default model.
+- Int8 device decode of three or more sequences multiplies on the tensor
+  cores (Ampere and later, mixed precision): 16 sequences on the default
+  model went from 13% slower than BF16 to about 12% faster.
+- Int8 device decode (`TransformerLm::set_int8_decode`) now covers the
+  routed MoE experts and the router as well, matching the host
+  `Precision::Q8` scheme: about 19% more tokens per second than BF16 for one
+  sequence on the default model, up from 10%.
+- Under mixed precision the device decoder's attention output projection
+  reads BF16, about 3% more tokens per second for one sequence.
+- A device decode step with one new token per sequence runs attention as
+  two fused kernels per layer instead of seventeen cuBLAS and softmax
+  launches: about 30% more tokens per second on the default model, for one
+  sequence or sixteen.
+- Under mixed precision the device decoder reads a BF16 copy of the LM head,
+  about 6% more tokens per second for one sequence on the default model.
+- Fused flash attention also serves a head width of 128, the width most
+  LLaMA-family checkpoints use, in training and in the forward pass. It used
+  to fall back to the three-kernel path; a 4 x 1024 training step at that
+  width runs 23% faster. `bench_train_step` takes the head width as an
+  optional fourth argument.
+- A `Decoder`, and so `generate`, on a model moved to the GPU keeps its
+  key/value cache on the device and runs every layer there, instead of
+  copying activations to the host for each projection. Cached decode of the
+  default model runs about three times as fast (197 to 624 tokens/s).
+- `bench_decode` takes `cuda` as an optional third argument to time cached
+  decode of the default model on the GPU.
+- Mixed-precision training runs the routed experts of a MoE layer in BF16, as
+  the dense feed-forward already did. The router, the expert outputs and the
+  scatter back into the residual stay FP32. About 4% more tokens per second
+  on the default model.
+- Under mixed precision the router and the shared expert of a MoE layer also
+  run in BF16, with FP32 router logits. About 2.5% more tokens per second on
+  the default model.
+
+### Added
+
+- `Bpe::train_json_split_digits`: `train_json` with Qwen2's split, so every digit is its own word and no token spans two digits (R3, for RustingLLM). The file carries the rule as a `Split` pre-tokenizer, which `Bpe::from_json` already reads.
+- `Schedule::warmup_stable_decay(peak, warmup, steps, decay_fraction)`: warmup, the peak held, then a linear decay to the floor over the last fraction of the run (R1, for RustingLLM). Rates before the decay do not depend on `steps`, so a run can be extended.
+- YOLO training throughput (K13g): the depthwise weight gradient reads channels coalesced, 1x1 stride-1 convolutions skip `im2col` and `col2im`, `detection_loss` runs each image on its own rayon task, several device buffers that a kernel overwrites whole skip their memset, and `examples/yolo_detect` trains in mixed precision (BF16 GEMMs, FP32 accumulate). SiLU runs inside the device batch norm kernels, and on a mixed-precision context a training convolution keeps bf16 columns and runs its three GEMMs and its `col2im` on bf16, four channels a thread. The batch norm's column sums come from one coalesced kernel instead of GEMVs, and its backward pass reads the incoming gradient through the SiLU instead of writing it out first. YOLO's convolutions no longer copy their input into their caches. The host detection loss reads anchors from the output maps in place, decodes them in parallel, and writes its gradients straight into the map buffers, and `TaskAlignedAssigner` picks each box's top candidates with a select instead of a full sort, with the boxes in parallel. `yolo_detect --warmup N` times the steady state. The device batch norm keeps its input for the backward pass instead of writing its normalized values out. YOLO's device backward pass accumulates gradients in place, a slice's straight into its channels. `yolo_detect --batch 4` at 1280 goes from 5.3 to 12.8 samples/s inside the warmup and runs at about 15.75 samples/s in the steady state.
+- `interoceptive::CausalTrunk`: a causal transformer over the observation window, one token per candle, chosen with `AgentConfig::causal: Some(CausalConfig { lookback, d_model, layers, heads })` (G8). `QNetwork::trunk` is now the `Trunk` enum and `AgentConfig` has a new `causal` field; code that builds `AgentConfig` with a struct literal and no `..AgentConfig::new(..)` needs `causal: None`.
+- `train_unet_lora` example: trains a LoRA on the attention projections of a Stable Diffusion 1.x UNet on the CUDA device and writes a diffusers PEFT file. New `UnetLora::new`, `UnetLora::write_peft` and `DeviceUnet::noise_step`. diffusers' `load_lora_adapter` loads the written file to within 8.5e-7 of `UnetLora::read_peft` (G10 c).
+- An ignored timing test, `cuda_image::lora::tests::an_sd15_step_at_512_is_timed`: one adapted forward and backward of Stable Diffusion 1.5's UNet at 512x512 on the device takes 191.0 ms on an RTX 3060 (65.1 forward, 125.9 backward; random weights of the 1.5 shapes), recorded in `docs/measurements.md` (G10 b-iii-c).
+- YOLO11 inference at 1280 under 15 ms, Gate 3 of the detection track (K13f). `Yolo11::fuse()` folds every batch norm into its convolution as ultralytics' `fuse()` does. On a `CudaDevice::with_mixed_precision` device, the fused 3x3 and strided convolutions build their `im2col` columns in bf16 and run bf16 GEMMs with an FP32 accumulator. `TrainableConv2d::infer_device(input, silu)` is a cache-free forward that adds the bias and SiLU in one kernel and reads a 1x1 convolution's input as its columns. `Yolo11::save_ultralytics(path)` writes an ultralytics state dict that `load_ultralytics` and ultralytics read back. `Validation::stages_ms` gives the time of each stage. On the 278 player val images (rect letterboxed, e.g. 1280x736), batch 1 on the 3060: upload 0.56 ms, forward 13.56 ms and download 0.47 ms, 14.6 ms for the model (37.7 ms unfused before), with mAP50 0.7390 (fp32: 0.7394). Decode on the host takes another 3.34 ms and NMS 0.02 ms. Other speedups: im2col reads and writes float4 with 32-bit indices, bias plus activation runs on float4, outputs written in full are left uninitialised, and a `Slice` node copies only its own channels.
+
+  The API a consumer crate uses, with features `cuda,images`:
+
+  ```rust
+  use rusting_brain::detection::{DetectionImage, non_max_suppression, read_yolo_split};
+  use rusting_brain::param::CudaDevice;
+  use rusting_brain::safetensors::SafeTensors;
+  use rusting_brain::yolo::{Yolo11, Yolo11Scale, decode, detection_loss, input_batch, validate};
+
+  // Load: weights exported from an ultralytics .pt as safetensors.
+  let mut model = Yolo11::new(Yolo11Scale::S, classes, &mut rng)?;
+  model.load_ultralytics(&mut SafeTensors::open("best.safetensors")?)?;
+  // or, to fine-tune from a checkpoint with other classes:
+  let skipped = model.transfer_ultralytics(&mut SafeTensors::open("yolo11s.safetensors")?)?;
+
+  // Train: see examples/yolo_detect.rs for ultralytics' full recipe.
+  let device = CudaDevice::new(0, 11000)?;
+  model.set_recompute_columns(true); // batch 4 at 1280 fits a 12 GB card
+  model.to_cuda_on(&device)?;
+  let images: Vec<DetectionImage> = /* DetectionImage::open(path, labels, 1280), augmented */;
+  let tape = model.forward_device(&device.upload(&input_batch(&refs))?, true)?;
+  let maps: Vec<_> = model.outputs_device(&tape).map(|m| m.download()).into_iter().collect::<Result<_, _>>()?;
+  let (losses, grads) = detection_loss([&maps[0], &maps[1], &maps[2]], classes, &targets);
+  let grads: Vec<_> = grads.iter().map(|g| device.upload(g)).collect::<Result<_, _>>()?;
+  model.backward_device(tape, [&grads[0], &grads[1], &grads[2]])?;
+  // then rusting_brain::optimizers::apply_step over model.params_mut(), and an
+  // rusting_brain::ema::Ema over model.state_mut()
+  model.to_cpu()?;
+  model.save_ultralytics("trained.safetensors")?;
+
+  // Run: fuse on the host, then infer one letterboxed image at a time.
+  let device = CudaDevice::with_mixed_precision(0, 8192)?;
+  let mut model = model.fuse();
+  model.to_cuda_on(&device)?;
+  let (image, _, _) = DetectionImage::open(path, &[], 1280)?.letterbox(736, 1280, false);
+  let tape = model.forward_device(&device.upload(&input_batch(&[&image]))?, false)?;
+  let maps: Vec<_> = model.outputs_device(&tape).map(|m| m.download()).into_iter().collect::<Result<_, _>>()?;
+  let (boxes, scores) = decode([&maps[0], &maps[1], &maps[2]], classes).remove(0);
+  let detections = non_max_suppression(&boxes, &scores, classes, 0.25, 0.7, 300);
+  // or validate(&mut model, &device, &val_images, 1280) for mAP50 and mAP50-95
+  ```
+- YOLO11 fine-tuning, Gate 2 of the detection track (K13e): `examples/yolo_detect.rs` reproduces ultralytics' training recipe and reaches val mAP50 0.7336 (mAP50-95 0.5467) on the player dataset in 25 epochs at batch 4 (1.57 h, 4.9 samples/s). New: `DetectionImage::affine` and `hsv` augmentations, `Yolo11::transfer_ultralytics` (loads a checkpoint with other classes, as `intersect_dicts`), `Yolo11::set_recompute_columns`, the Detect head's bias initialisation, `yolo::input_batch`, and `yolo::validate` returning `Validation`; `examples/yolo_val.rs` now calls `validate`.
+- GRU cell with backward through time (K9): `recurrent::Gru::new(input, hidden, rng)`, `forward_seq(x, batch, h0) -> (Matrix, GruCache)`, `backward_seq(&cache, grad_out, grad_h_last) -> (dx, dh0)`, `step` for a frame at a time, `params_mut`, `to_cuda_on` for the gate GEMMs. PyTorch's equations; every gradient within 1.7e-4 of finite differences over 16 steps.
+- `examples/yolo_val.rs` (K13d, Gate 1): validates YOLO11 weights on a YOLO dataset with ultralytics' rect batches, NMS and mAP. The trained player model scores mAP50 0.7394 and mAP50-95 0.5803 on its 278 val images, against ultralytics' 0.739 and 0.576.
+- YOLO11 graph (K13a-iii): `yolo::Yolo11` builds any YOLO11 scale, loads an ultralytics state dict (`load_ultralytics`), and runs forward and backward on the host or the device (`forward_device`, `backward_device`). `yolo::decode` turns the raw maps into boxes and scores for `detection::non_max_suppression`; `yolo::detection_loss` is ultralytics' `v8DetectionLoss` with its gradient. Matches ultralytics 8.4.174 within 1e-4.
+- DINOv2 towers in `vit_encoder` (K12): `VitEncoder::load_dinov2(path, image_size, precision)` loads `facebook/dinov2-small` and `-base` safetensors; patch tokens are rows 1.. of `encode`, normalised with `IMAGENET_MEAN`/`IMAGENET_STD`. Within 4.2e-5 relative of HF `transformers` on two images. `ffn::gelu_erf` is the exact GELU, also on the device.
+- `DepthwiseConv2d` (no bias, padding k/2) and `pixel_attention`, the middle of ultralytics' `Attention` from its qkv map to the attended map and values, each with backward on host and device. The attention takes the qkv map rather than owning its convolutions, so C2PSA composes it from `TrainableConv2d`, `TrainableBatchNorm2d` and `DepthwiseConv2d` (K13a-ii).
+- Detection layers (K13a-i) in `conv`: `TrainableBatchNorm2d` with training and evaluating modes, PyTorch's running statistics and `fuse_into` a convolution; `upsample_nearest_batch`, `concat_channels`, `split_channels`, `max_pool_same` and their backwards; each with a device version, plus `add_device`.
+- Detection ops (K13b) in `detection`: `box_iou` with `Overlap::{Iou, Giou, Ciou}` and its gradient, `distribution_focal_loss`, `make_anchors`, `box_to_ltrb`/`ltrb_to_box`, `TaskAlignedAssigner`, `non_max_suppression` and `mean_average_precision`, all matching ultralytics 8.4.174 on exported fixtures. Host only; CUDA NMS waits for the Gate 3 profile.
+- `detection` module (K13c): `read_yolo_split` and `parse_yolo_labels` for YOLO-format datasets, `rect_shape` for ultralytics' validation batch shape, and `DetectionImage` with `open` (decode and resize the long side), `resized` (OpenCV-style bilinear), `letterbox` and `flip_horizontal`, plus `mosaic` for the four-image mosaic. Boxes match ultralytics' pipeline on the CS2 player dataset.
+- `examples/chop_block_step.rs` times RustingChop's seven convolution blocks on the per-layer and the device-resident paths (K8d). At batch 128 on the RTX 3060 a forward and backward step drops from 1002 ms to 99 ms.
+- Device spatial softmax and global average pooling (K8c): `conv::spatial_softmax_device` and `spatial_softmax_backward_device` with `DeviceSpatialSoftmaxCache`, `conv::global_avg_pool_device` and `global_avg_pool_backward_device`. Outputs are `batch x 1 x 1 x C` device batches (2C for the softmax keypoints) and match the host functions without leaving the card.
+- `Glb::base_color_image(mesh, primitive) -> Option<(&[u8], &str)>`, `Glb::json()` and `Glb::binary()` (asked by RustingMedia). The request left the primitive's type open; it is the pair of indices into `meshes` and that mesh's `primitives`. Images held by URI return `None`.
+- Device group norm and SiLU for `DeviceImageBatch`: `TrainableGroupNorm::to_cuda_on`/`to_cpu`/`forward_device`/`backward_device` (with `DeviceGroupNormCache`), `conv::silu_device` and `conv::silu_backward_device` (K8b). The request named the layer `GroupNormTrainable`; it is `TrainableGroupNorm`, with the device pass as methods.
+- `conv::DeviceImageBatch` with `CudaDevice::upload`/`download`, and `TrainableConv2d::forward_device`/`backward_device`: a convolution chain whose activations and gradients stay on the device (K8a, asked by RustingChop and RustingCS2). The wanted `ConvCache` return is kept; the conv bias and its gradient now run on the device too.
+- `conv::TrainableGroupNorm`: group norm over an `ImageBatch` with `gamma`/`beta` parameters, `forward -> (ImageBatch, GroupNormCache)`, `backward` and `params_mut` (asked by RustingChop and RustingCS2). Its forward is bit-equal to `conv::GroupNorm`. `new` and `forward` return a `Result` (bad group counts and channel mismatches), and `eps` is an argument where the Chop stopgap fixed Keras' 1e-3.
+- `param::Dropout`: inverted dropout with `forward(&input, &mut rng, training) -> (Matrix, DropoutMask)` and `backward(&mask, &grad)` (asked by RustingChop and RustingCS2). `Dropout::new` returns a `Result`, refusing rates outside [0, 1), where the request had a plain constructor.
+- `conv::spatial_softmax` and `conv::global_avg_pool` over an `ImageBatch`, each with its backward (`spatial_softmax_backward`, `global_avg_pool_backward`) (asked by RustingChop and RustingCS2).
+- `TrainableConv2d::without_bias()`: a convolution that adds, gathers and trains no bias, for one before a norm (asked by RustingChop). A builder rather than `bias: Option<Param>`, so the public `bias` field keeps its type.
+- `losses::bce_with_logits`, `losses::soft_cross_entropy` and `losses::huber` take logits (or raw predictions) and optional per-sample weights, reduce as `sum(w * loss) / batch`, and return the gradient with the loss (asked by RustingChop and RustingCS2).
+- `ffn::silu_derivative` is public, for hand-written backward passes through SiLU (asked by RustingChop and RustingCS2).
+- FP16 device backward kernels for UNet adapter training in `cuda_image`: convolution input gradients, group and layer norm, the gated GELU, SiLU and nearest upsampling, each matched to the host `unet_lora` functions.
+- `DeviceUnet::forward_adapted` runs a UNet LoRA's attention adapters on the device and keeps a tape for the backward pass, matched to `UnetLora::forward`.
+- A device attention backward for any head width in `cuda_image`, a chunk of query rows at a time with key and value gradients summed in FP32.
+- `DeviceUnet::backward_adapted` takes a `DeviceTape` and `dL/d(prediction)` back through the whole UNet to every attention adapter's gradients on the device; `DeviceAdapters::add_gradients` adds them to the host `UnetLora`. Within 0.3% of `UnetLora::backward` overall.
+- `unet_lora::UnetLora`: LoRA adapters on a UNet's attention projections,
+  read from a diffusers PEFT file, with a host forward and backward pass
+  whose adapter gradients match PyTorch autograd within 5e-5. It is the
+  reference for UNet LoRA training on the GPU.
+- `examples/train_dit_lora.rs` trains a LoRA on a FLUX-style DiT from a
+  folder of captioned images on the CUDA device (`DitLora::new`,
+  `DeviceDit::flow_step`) and writes a diffusers PEFT file. diffusers loads
+  it to within 1.1e-6 of this crate's own prediction with it.
+- `DeviceDit` runs DiT LoRA adapters on CUDA and returns their gradients
+  from a device backward, within 2e-2 of the host reference. One step at
+  1024 image tokens on a 768-wide, six-block DiT takes 45-56 ms.
+- `dit_lora::DitLora`: LoRA adapters on a DiT's block projections, read from
+  a diffusers-FLUX PEFT file, with a host forward and backward pass whose
+  adapter gradients match PyTorch autograd within 6e-5. It is the reference
+  for DiT LoRA training on the GPU.
+- Textual inversion: `ImagePipeline::add_embedding` adds a learned prompt
+  token from a diffusers, A1111 or SDXL (`clip_l`/`clip_g`) safetensors file
+  to every CLIP tower, and a multi-vector token stands for all its vectors,
+  as diffusers expands it. Hidden states and pooled vectors match diffusers
+  on a tiny tower with the SDXL tokenizers within 1e-5. Legacy CLIP configs
+  (`eos_token_id = 2`) now pool at the highest id, as Transformers does.
+- Inpainting: `Inpaint` wraps any `Denoiser` with a picture latent and a
+  keep weight a latent row, and `ImagePipeline::sample_latent_inpaint`
+  repaints only where the weight is zero, under every solver and schedule.
+- `ImagePipeline::generate_inpaint` repaints a picture under a pixel mask.
+  Inpainting UNets (nine input channels) load and read the mask and the
+  masked picture as diffusers feeds them, matching diffusers within 6e-7;
+  other models are steered through `Inpaint`.
+- `ControlNet` loads diffusers ControlNets for UNet models, and
+  `Unet::set_controls` lets one or more of them steer the layout from an edge,
+  depth or pose picture, on the CPU or a CUDA device; matches diffusers
+  within 9e-7.
+- `ImagePipeline::load_with_loras` and `ShardedSafeTensors::add_lora` merge
+  published LoRA files (PEFT/diffusers and kohya spellings, including
+  kohya's SDXL and FLUX files that use the original models' module names,
+  whose fused FLUX projections are split onto diffusers' parts) into a UNet
+  or DiT, and into the CLIP text encoders, as they load; matches PEFT's
+  `fuse_lora` within 1.1e-6.
+- `TransformerLm::log_probabilities` gives each token's log-probability
+  after the ones before it, for scoring and ranking texts.
+- `TransformerLm::generate_beam` runs beam search, with an optional end
+  token.
+- `Decoder::fork` copies a session, so a shared prefix is prefilled once
+  and each request continues its own fork.
+- `Decoder::logits` and `Decoder::push`, and the same on `BatchDecoder`:
+  read the next-token logits and append an id of the caller's choosing, for
+  constrained decoding, logit biases and log-probabilities.
+- `BatchDecoder::feed` accepts prompts of different lengths. On a device the
+  shorter ones are padded on the left and the padding is masked out of
+  attention; later feeds still give every sequence the same number of
+  tokens.
+- `Sampler::min_p`, `Sampler::presence_penalty` and
+  `Sampler::frequency_penalty`.
+- `TransformerLm::generate_speculative_with` runs speculative decoding with
+  any `Sampler`, accepting draft proposals by rejection sampling so the
+  output is distributed as sampling the target model alone.
+- CLIP zero-shot classification and retrieval: `VitEncoder::embed` projects
+  the image tower's class token, `clip::logit_scale` reads the learned
+  temperature, and `clip::zero_shot` turns an image and captions into
+  probabilities. Matches `transformers`' `CLIPModel` within 2.2e-7.
+
+- `TransformerLm::set_8bit_optimizer_state` holds the device Adam moments at
+  one byte each (block-wise, bitsandbytes' dynamic map). The default model
+  trains in 1723 MiB instead of 2037 at the same speed, and its loss over
+  2000 steps tracks the FP32 state.
+
+- `VaeEncoder::attach_device`, and `ImagePipeline::to_cuda` moves the VAE
+  encoder too: image-to-image encodes a 1024x1024 picture in 0.25 s instead
+  of about two minutes on the CPU.
+- Tutorial chapter 18, generating images from text with a published
+  diffusion model, and a new Part V in the course index.
+- CI runs `cargo semver-checks` against the latest release tag.
+- `cuda_mmdit::DeviceDit` runs the FLUX-style MMDiT denoiser on the device
+  with BF16 weights, FP32 residual streams and the fused attention kernel.
+  A small FLUX-shaped model over a 512x512 image takes about 16 ms a pass
+  against 1.27 s on the host, at the same speed with int8 weights.
+- `cuda_t5::DeviceT5` runs a gated T5 encoder (T5 1.1, the one FLUX and
+  Stable Diffusion 3 read) on the device with BF16 weights and an FP32
+  residual stream. A T5-base-sized encoder over 512 tokens takes about 29 ms
+  against 528 ms on the host.
+- `TransformerLm::quantize_lora_base_4bit(Codebook::Nf4)`: QLoRA on an NF4
+  base, on the host and the device. A rank-16 run on the default model
+  peaks at 762 MiB against 778 on an int8 base and 889 on FP32, at the same
+  step time. `has_int8_base` is now `has_quantized_base`.
+- 4-bit host weights: `TransformerLm::quantize_4bit(Codebook::Nf4 | Int4)`
+  stores every block linear as two 4-bit codebook indices a byte with an
+  absmax scale per block of 64 (0.5625 bytes a weight), keeping the
+  embedding and an untied head at int8. `bench_decode` takes `nf4` as its
+  quantization argument. Host decode of a 100M-parameter shape runs about 17%
+  faster than int8.
+- `TransformerLm::quantize_lora_base`: holds a LoRA run's frozen base
+  projections as int8 with a scale per row, on the host and the GPU, so
+  fine-tuning keeps the base in a quarter of the memory at the same step
+  time. The adapters train in full precision and save with `save_lora`.
+  `examples/checkpoint_memory` takes `lora` as a third argument to compare.
+- `TransformerLm::set_int8_decode` makes device decoders read the attention,
+  dense and shared-expert feed-forward and output-head weights as int8 with a
+  scale per row: about 10% more tokens per second for one sequence on the
+  default model, 13% fewer for 16. `bench_decode` takes `int8` as a fifth
+  argument.
+- `TransformerBuilder::checkpoint` and `TransformerLm::set_checkpoint` pick
+  blocks whose activations are recomputed in the backward pass on the device
+  instead of kept. With every block checkpointed, a 16 x 512 step on the
+  default model peaks at 1353 MiB instead of 2843 MiB and takes 23% longer.
+  `examples/checkpoint_memory.rs` measures both.
+- `TransformerLm::save_gguf`: writes a LLaMA-layout model as a GGUF file in
+  F32 or Q8_0 for llama.cpp and Ollama, with query and key rows reordered for
+  llama.cpp's rotary convention.
+- `TransformerLm::generate_speculative`: greedy speculative decoding with a
+  smaller draft model, one target pass per round of drafted ids, giving the
+  same continuation as greedy `generate`. `KvCache::truncate` drops cached
+  positions.
+- `sample_unipc`: the UniPC multistep predictor-corrector solver at
+  diffusers' defaults, matching `UniPCMultistepScheduler` step for step.
+- `Scheduler::lcm_sigmas` and `sample_consistency`: the timesteps and the
+  multistep consistency loop a latent consistency model (LCM, LCM-LoRA) runs
+  in two to eight steps, matching diffusers' `LCMScheduler` timesteps.
+- `TransformerLm::batch_decoder(n)` returns a `BatchDecoder`, which decodes n
+  sequences in step and samples one token for each per `next`. On a device
+  model the n sequences share every weight read: the default model decodes
+  1994 tokens/s over 4 sequences and 9093 over 64, against 618 for one.
+  `bench_decode` takes the sequence count as an optional fourth argument.
+- `TransformerCache::expert_loads`: each MoE layer's share of routed tokens
+  per expert, from a forward pass on the host or the GPU, for checking that
+  routing on real data stays balanced.
+- `VaeDecoder::decode_tiled`: decodes a latent in overlapping tiles blended
+  with linear ramps, so images too large to decode at once fit in memory.
+- `SpikeGuard`: flags a training loss that is not finite or jumps above a
+  multiple of its moving mean, so a loop can skip that step and, after
+  several in a row, roll back to its last checkpoint.
+- `Bpe::train_json`: trains a byte-level BPE tokenizer on a text corpus and
+  writes a `tokenizer.json` that `Bpe::from_json` loads.
+- `TransformerLm::step_with_update_ratios`: one optimizer step that returns
+  each parameter's update-to-weight ratio, for spotting a layer that steps
+  too far or has stopped learning. Copies the weights to the host, so call
+  it occasionally.
+- Karras noise levels for DDIM-schedule models: `Scheduler::karras_sigmas`,
+  run through the new `sample_with_sigmas`. With `Solver::DpmPlusPlus2m` this
+  is "DPM++ 2M Karras".
+- z-loss on the LM head: `TransformerBuilder::z_loss(weight)` or
+  `TransformerLm::set_z_loss` adds `weight * logsumexp(logits)^2` to the
+  training loss, reported in `TotalLoss::auxiliary_loss`, on the host and in
+  the fused CUDA head. Off by default.
+- Tutorial chapter 17, fine-tuning with LoRA: attach an adapter, train it,
+  save it alone, load it onto the base, merge it, and measure what the base
+  forgets.
+
+- `webdataset::WebDataset` reads WebDataset tar shards one sample at a
+  time: the members that share a key, such as `000017.jpg` and
+  `000017.txt`, come back together. No new dependency.
+- Prioritized replay for the interoceptive agent: build the trainer's buffer
+  with `ReplayBuffer::prioritized` and it samples by TD error, weights the
+  loss by importance (`InteroceptiveAgent::train_step_weighted`,
+  `weighted_td_huber_loss`) and updates the priorities after each step.
+- `scripts/bench_check.sh`: fails when `bench_train_step` or `bench_decode`
+  is more than 3% below its row in `docs/baseline.md`. Run it locally before a
+  release; CI has no GPU.
+- `rusting_brain::BUILD`: the library version and the git commit it was built
+  from. Print it at startup to spot a binary built from an older checkout.
+- `Bpe` tokenizes LLaMA 3 and Qwen2 files the way the reference does: their
+  split rule (digits in runs of up to three, or one for Qwen2,
+  case-insensitive contractions) and `ignore_merges`.
+- `Bpe` reads sentencepiece-style BPE files (LLaMA 2, Mistral, TinyLlama):
+  `▁` for spaces and `<0xNN>` byte fallback, with the `Metaspace`
+  pre-tokenizer or the older `Prepend` normalizer. Ids match the Hugging Face
+  `tokenizers` library.
+- `interoceptive::backtest` scores the greedy policy over real candles, with
+  costs and without shocks: total return, per-step Sharpe, maximum drawdown
+  and liquidation, beside a buy-and-hold baseline. `walk_forward` makes the
+  train and test windows.
+
+### Changed
+
+- Tutorial chapter 16 trains from `TokenFile` shards, and chapters 14 and 16
+  and the README load tokenizers with `Bpe` rather than the `tokenizers` crate.
+
+- `Bpe` merges in `n log n` instead of `n^2`. A sentencepiece-style file
+  (LLaMA 2, Mistral, TinyLlama) merges the whole text as one piece, so a
+  50 KB document went from 43 s to 13 ms. Ids are unchanged.
+- CUDA tests that find no device print `skipped: no CUDA device`, and fail
+  instead when `RUSTING_BRAIN_REQUIRE_CUDA` is set, so a GPU run cannot pass
+  without running them. CI builds the docs with `-D warnings`.
+
+- `InteroceptiveAgent::train_step` uses Double DQN targets: the online
+  network picks the next action and the target network scores it, which
+  removes the overestimation of a plain max. `double_bellman_targets` is
+  public; `bellman_targets` is unchanged.
+
+### Fixed
+
+- The CUDA test suite no longer fails at random in tests that need the fused attention kernel (J11). Two parity tests turned that kernel off through a process-wide switch while they ran, so a test running alongside them on another thread lost it too. The tests' switch is now per thread; `RUSTING_BRAIN_NO_FLASH` still turns the kernel off for the whole process. A full `cargo test --features cuda,images --lib` failed in 5 of 6 runs before and in none of 6 after.
+- `Mesh::simplify` and `Mesh::simplify_within` no longer depend on which of several equally cheap edges the queue hands out first (J10). An edge refused because it would fold a face used to be dropped for good; now, once nothing cheap is left, the refused edges are weighed again for as long as a round still collapses something. A flat 6x6 grid within 1e-6 failed to reach its two corner faces in 3 of 200 runs before and in none of 400 after.
+- A device convolution asked to add into a map with a different channel
+  count is an error, instead of writing past the end of that map.
+- A CLIP text or image tower saved by Transformers 5, whose keys leave off
+  the `text_model.` or `vision_model.` prefix, loads instead of failing on a
+  missing tensor.
+- A `.safetensors` header whose shape product overflows, and a LoRA file
+  with a scalar, empty or mismatched rank, are now errors. Before, release
+  builds could wrap the product and read past a buffer.
+- `ClipTextConfig::from_file` read the legacy `bos 0, eos 2` of older CLIP
+  configurations (OpenAI CLIP, Stable Diffusion 1.x, FLUX.1's CLIP-L) as
+  real tokens, so prompts started with `!` and pooled at the wrong row. It
+  now uses the vocabulary's last two ids, as `transformers` does.
+
+- Stable Diffusion XL, 2.x and 3 prompts are padded with the pad token the
+  tokenizer names (`!` for SDXL's second tower) instead of the end token. The
+  UNet reads the padded positions, so the wrong token gave every SDXL image
+  a cross-hatched texture and made image-to-image repaint far more than its
+  strength asked. New `ClipTextEncoder::set_pad_token`.
+- The device VAE decoder returns an error when an FP16 overflow leaves
+  non-finite values in the image, instead of a black image.
+- Byte-level BPE encoding no longer slows down quadratically on long text:
+  the GPT-2 pre-tokenizer copied the rest of the text at every character
+  (78,000 characters went from 617 ms to 1.4 ms).
+- LoRA training on CUDA works under mixed precision, the default. Folding the
+  adapter into a BF16 weight asked cuBLAS for an FP32-to-BF16 GEMM it does
+  not have, so every step failed with `CUBLAS_STATUS_NOT_SUPPORTED`; the test
+  covered FP32 only.
+
+- `TransformerLm::save_bin` and `save_lora` copy the weights back from the
+  device first, as `save_hf` already did. A model trained on CUDA used to
+  save the weights it had before its first device step.
+
+- Corrupt files no longer panic or allocate without limit: a huge token id in
+  `tokenizer.json`, a truncated or overflowing `.npy` or IDX header, and a
+  weight, LoRA or weight-average file whose header claims more than the file
+  holds now return an error. `load_bin` also refuses a LoRA rank larger than
+  the smallest weight it adapts. A seeded corruption test (`fuzz::*`) covers the
+  file readers.
+- `step_clipped` skips the update when the gradient norm is NaN or infinite
+  and clears the gradients, instead of writing NaN into the weights and the
+  optimizer moments. The returned norm shows the skip.
+- `Bpe` no longer reads the empty `end_of_word_suffix` that Qwen files write
+  as a CLIP-style suffix, which had made every Qwen tokenization wrong.
+
+## 3.0.0
+
+A major version because three public configuration structs gained fields, so
+a struct literal that names every field no longer compiles. Add the field, or
+build from `Default` with `..Default::default()` where the struct has one:
+
+- `TransformerConfig::rope_scaling` (`None` keeps the old behaviour).
+- `RopeSpec::scaling` (`None` keeps the old behaviour). `RopeSpec` has no
+  `Default`, so name the field.
+- `ShapeVaeConfig::free_bits` (`0.0` keeps the old behaviour).
+
+Nothing was removed or renamed. Checkpoints written by 2.x load unchanged:
+every new field defaults when it is missing from the file.
+
+### Added
+
+- `TransformerLm::save_hf` and `TransformerLm::load_hf` (`src/hf.rs`) write and
+  read the Hugging Face LLaMA layout, a `config.json` beside a
+  `model.safetensors`. `transformers` reads the export as `LlamaForCausalLM`.
+  The loader takes LLaMA and Mistral checkpoints, single-file or sharded, and
+  refuses what the layout cannot hold (biases, per-head q/k norms, MoE or GELU
+  layers, attached LoRA, quantized weights, YaRN or dynamic rope scaling, a
+  sliding window shorter than `max_seq_len`) instead of approximating it.
+- `RopeScaling`, with linear and Llama 3.1 (`llama3`) scaling, set through
+  `TransformerBuilder::rope_scaling`. It changes how the rotary tables are
+  built, so the CPU path, the CUDA upload and the ONNX export all use it.
+- `TokenMix` draws each batch from several `TokenFile`s by weight. Every draw
+  comes from the step number and the mix seed, so a resumed run sees the same
+  batches.
+- The `interoceptive` module: a DQN trading agent whose market trunk is gated
+  by a model of the account's own state, with a homeostatic reward. A test
+  holds its simulation and replay loop to zero heap allocations per step.
+- `DeviceVitEncoder` runs the CLIP vision tower on CUDA in batches.
+- `ShapeVaeConfig::free_bits`, a per-unit KL floor for
+  `losses::kl_divergence_free_bits`. The shape decoder's norms run in BF16,
+  and the device decode goes through `decode_train`, so chunked decoding works
+  on CUDA.
+
+### Fixed
+
+- `TrainableConv2d` trained its bias with a zero gradient on CUDA: the bias
+  lived on the device while its gradient landed on the host copy.
+
+### Changed
+
+- The cross-attention backward is split across sequences, and short softmax
+  rows stay in registers.
+- `save_bin` and `save_optimizer_state` stream each tensor through a fixed
+  16 KiB buffer instead of building a full byte copy of it.
+
+### Documentation
+
+- The CUDA out-of-memory error explains fragmentation.
+- The README scope now covers
+  `Conv2d` and `TrainableConv2d` and lists the model types.
+- `Matrix::random` is documented as unseeded test filler.
+
+## 2.0.1 and 2.0.2
+
+These two releases shipped without their own changelog headings. Everything
+below up to 2.0.0 went out in one of them. The `ImagePipeline` changes
+described next were breaking and went out in 2.0.1, a patch release.
 
 Everything here is additive except the seams around `ImagePipeline`:
 `ImagePipeline::new` takes a `PromptEncoder` in place of a tokenizer and an

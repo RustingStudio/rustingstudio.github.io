@@ -3,7 +3,7 @@ title: "RustingEngine Architecture"
 project: "engine"
 kind: "docs"
 group: "Reference"
-order: 6
+order: 28
 description: "This document records boundaries that must remain stable as the roadmap is implemented. New features should fit these boundaries instead of reaching across layers. If a boundary must change, update this document and add a migration plan before changing public APIs."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/architecture.md"
 ---

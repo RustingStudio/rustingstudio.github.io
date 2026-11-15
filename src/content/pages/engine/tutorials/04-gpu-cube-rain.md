@@ -88,10 +88,21 @@ chooses how:
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `solver` | `Full` | `Full`, `Simplified`, `NoCollision`, `Space` (mutual gravity), or `Custom` |
-| `custom_shader` | `None` | project-relative compute shader when `solver` is `Custom` |
+| `custom_shader` | `None` | project-relative GLSL when `solver` is `Custom`; see [GPU condition shaders](/engine/docs/gpu-condition-shaders/) |
 | `rigid_body` | `RigidBody::default()` | mass, starting velocity, gravity |
 | `collider` | `Collider::default()` | shape, friction, restitution |
 | `collision_layers` | all | which groups collide |
+
+`rusting docs show api/GpuBodySettings` lists the same fields.
+
+**Dense piles.** The GPU solver has no damping setting; `collider.friction`
+is what decides how a packed pile moves. In a ball pit of 40,000 spheres
+pushed through a 1.4 m tube, friction 0.3 jammed the tube (0 balls through
+in 60 s) and 0.05 moved 38,948 balls in the same time. Start near 0.05
+for plastic balls or grain that should flow. A dense pile also has a sharp
+jamming threshold for the force that drives it: below some push it stops
+completely rather than flowing slower, so pace a flow by how many bodies
+move, not by a weaker push.
 
 You can set the same thing in a scene: set an object's
 `physics_body.simulation` to `Gpu`. See [Core concepts](/engine/docs/concepts/#physics-cpu-and-gpu).
@@ -134,6 +145,9 @@ scene.watch_gpu_object(
 );
 ```
 
+Conditions combine with `&` and `|`, for example
+`GpuCondition::colliding() & GpuCondition::position_y().less_than(0.0)`.
+
 Add a floor for it to land on: a cube scaled to `[60, 1, 60]` at
 `[0, -2, -20]` whose `physics_body.simulation` is `Static`. Static bodies
 collide with both the CPU and the GPU solver. With the floor in place the
@@ -144,16 +158,19 @@ from code, for example to launch a drop upward.
 
 ## 4. Testing GPU games
 
-Headless runs (`rusting run --ticks`, `rusting test`) have no renderer, so
-GPU bodies stay where they started and GPU rules never fire. Test the CPU
-side headless, such as spawning and counting the class:
+`rusting run --ticks` has no renderer, so GPU bodies stay where they started
+and GPU rules never fire. `rusting test` runs them when the scenario has
+`"gpu": true` or a `capture` step; a scenario without either leaves them
+where they spawned. A scenario with `"gpu": true` and a check on a counter
+that your `update` raises from `drop_fell` events tests the GPU side. Test
+the CPU side with no Vulkan device, such as spawning and counting the class:
 
 ```bash
 rusting run "Cube Rain" --ticks 30
 ```
 
 The run exits with code 0 once the spawn code has worked. Check GPU
-behaviour by playing the game, or with the engine's GPU tests
+behaviour with a `"gpu": true` scenario, by playing the game, or with the engine's GPU tests
 (`cargo test --features gpu-tests`), which run the solvers on a real or
 software (lavapipe) Vulkan device.
 

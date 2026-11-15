@@ -57,7 +57,7 @@ Scene View controls follow Blender:
 | Action | Input |
 | --- | --- |
 | Select, add to selection | Click, `Shift`-click |
-| Move, rotate, scale the selection | `R`, `R`, `S`, then `X`, `Y`, or `Z` to lock an axis; click to confirm, right-click to cancel |
+| Move, rotate, scale the selection | `G`, `R`, `S`, then `X`, `Y`, or `Z` to lock an axis; click to confirm, right-click to cancel |
 | Focus the selection | `F` |
 | Fly | Hold the right mouse button, then `W` `A` `S` `D`, `Space` up, `Ctrl` down, `Shift` faster |
 | Orbit, pan, zoom | Middle mouse button, `Shift` + middle mouse button, wheel |
@@ -89,7 +89,8 @@ with no window and exit, which works on machines with no display.
 
 ```text
 Hello Cube/
-  Cargo.toml         a normal Cargo package that depends on rusting_engine
+  Cargo.toml         a normal Cargo package that depends on rusting_engine,
+                     with quick build profiles (see below)
   project.json       name, main scene, binary name, determinism level
   src/main.rs        your game code
   scenes/main.rscene the scene, as readable JSON
@@ -99,9 +100,17 @@ Hello Cube/
 ```
 
 A game is an ordinary Rust program. You can add any crate to its
-`Cargo.toml` and debug it with your usual tools. The game loads the cooked
+`Cargo.toml` and debug it with your usual tools. Its debug build optimizes
+the engine fully and the game's own code lightly (`opt-level = 1`, which
+keeps debug assertions and overflow checks), and its release build is
+incremental, so tests and rebuilds stay quick (`rusting export` builds
+without incremental, so the shipped game is fully optimized); `rusting fix` adds these
+profile keys to a game made with an older engine. The game loads the cooked
 scene from `build/`, so cook first (`rusting cook`, or Play once); after
-that, plain `cargo run` in the project folder works too.
+that, plain `cargo run` in the project folder works too. After you edit the scene,
+cook again: `cargo run` and the built binary print a warning when the
+cooked scene is older than the scene file. `rusting run` and `rusting test`
+cook for you.
 
 ## Next
 

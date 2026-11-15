@@ -3,7 +3,7 @@ title: "M2 results: GPU forward"
 project: "strata"
 kind: "docs"
 group: "Reference"
-order: 2
+order: 9
 description: "Model: Qwen3.6-35B-A3B-UD-Q2_K_XL, RTX 3060 12 GB, Ryzen 5 7600X. llama.cpp reference commit 5d8ccdf9d."
 source: "https://github.com/RustingStudio/RustingStrata/blob/main/docs/m2-results.md"
 ---
@@ -11,7 +11,7 @@ Model: Qwen3.6-35B-A3B-UD-Q2_K_XL, RTX 3060 12 GB, Ryzen 5 7600X. llama.cpp refe
 
 ## Parity (20 prompts x 32 greedy positions vs llama-server)
 
-`python -I tools/parity.py <model> --bin target/release/strata --extra=--gpu --tag gpu`
+`python -I tools/parity.py <model> --bin target/release/rustingstrata --extra=--gpu --tag gpu`
 
 - Top-1 agreement 631/640 = **98.59%** (gate: 99%).
 - Every miss on a prompt the CPU reference has also scored is the same miss, at the same position, with the same

@@ -3,249 +3,685 @@ title: "Changelog"
 project: "engine"
 kind: "docs"
 group: "Reference"
-order: 9
-description: ""
+order: 31
+description: "The look release, driven by a voxel game: shader packs restyle a whole game with a folder of GLSL files, shadows soften with distance and fall through leaves, light shines through thin surfaces, and opaque scenes draw faster. 2.5.7, 2.6.0 and 2.6.1 got no GitHub Release of their own; their notes are in CHANGELOG.md. Needs rusting-core 0.4.0, which adds the RenderSettings::shadow_distance and shadow_cascades fields."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/CHANGELOG.md"
 ---
 ## [Unreleased]
 
-### Fixed
+## [2.7.0] - 2026-10-20
 
-- Code-review fixes:
-  - A fixed GPU body only becomes a CPU collider with a Full or Simplified solver and an explicit Fixed rigid body.
-  - Fluid Block and Water Body no longer share a material; water and fluid coupling skip GPU and child bodies; water and the player's platform ride use the parent's world position.
-  - A fluid surface or water surface that is switched off, removed or orphaned is despawned and its mesh and material freed. A resting fluid keeps its mesh, and the surface mesh is indexed and welded.
-  - Fluid blocks are capped at 50,000 particles; `Fluid::step` ignores `dt <= 0`; `GameScene::restore` brings back fluid particles.
-  - Scene `InputAction` bindings follow the component (edit, removal, scene replace); game-code bindings stay.
-  - `set_scene` rejects mistyped setting names, and unrelated entities no longer fail a patch's field check.
-  - Third-person camera collision at distance 0, `set_tile` growth (max 4096 cells), environment map load retry, CPU fast-body sweep prefilter, `EditorTheme::ICON_CAMERA`.
-  - Not changed: the slow-motion clamp is recorded before replay, so replays are exact by design; `Sleeping` bodies wake when buoyancy changes their velocity.
-- The first-person player, raycasts and CPU bodies pass through fixed boxes whose simulation is GPU. A fixed GPU body never moves, so it now also stands in the CPU collision world as a static collider (GPU bodies still collide with each other on the GPU). Dynamic GPU bodies stay invisible to CPU queries; use `GpuQueryProxy` for those.
-- A Blend material at Opacity 0 is no longer faintly visible. Reflections are not scaled by alpha, so it still drew a faint mirror; a surface with alpha 0 and no transmission now draws nothing.
+The look release, driven by a voxel game: shader packs restyle a whole game with a folder of GLSL files, shadows soften with distance and fall through leaves, light shines through thin surfaces, and opaque scenes draw faster. 2.5.7, 2.6.0 and 2.6.1 got no GitHub Release of their own; their notes are in `CHANGELOG.md`. Needs `rusting-core` 0.4.0, which adds the `RenderSettings::shadow_distance` and `shadow_cascades` fields.
+
+Scenes, save files and game code from 2.6.1 work unchanged, with three differences. Rust code that builds a `MeshVertex` or `RenderSettings` without `..Default::default()` must add the new fields (`data`; `shadow_distance` and `shadow_cascades`). Surface shaders that build a `Surface` with its constructor must add the new last field, `subsurface`. Shadow edges, and opaque surfaces that meet at equal depth, look slightly different in captures.
+
+### Shader packs
+
+- A shader pack is a folder of GLSL hook files with a `pack.json` that restyles a whole game: every surface (programs `terrain`, `water`, `translucent`, `entities`, `hand`, each with `vertex`, `fragment` and `shadow` hooks), the sky, clouds, fog, particles, the final image, and up to 8 full-screen `composite` passes over the HDR image before bloom. Packs live in `assets/shaderpacks/<id>/` or, for the player's own, in the user data folder's `shaderpacks/` (id `user/<folder>`); `project.json` `"shader_pack"` names the default. `rusting docs show guide/shader-packs` covers the format and includes a small sample pack.
+- Packs declare bool, enum and slider options (`OPT_*` defines in GLSL), Low/Medium/High/Ultra presets and named `values` (`PACK_*` constants). Game code lists and switches packs, presets and options with `scene.shader_packs()`, `set_shader_pack`, `set_shader_preset`, `set_shader_option` and friends, and hands packs the time of day, weather and eye state with `scene.set_shader_world(ShaderWorld { .. })`.
+- Every hook sees a `frame` uniform block with this and last frame's camera, the sun and moon, time, screen size, weather and eye state. Mesh vertices gain a `data` word (`MeshVertex.data`): bits 0-15 an id, then flags for foliage, leaves, water, lava, emissive, glass and metal, which vertex and surface hooks read as `block_id` and `flags`. `MaterialAsset.program` picks the program a material draws with. A material's own shader and a scene's sky, fog, post or particle shader still win over the pack.
+- F3+T reloads the pack, and debug builds reload it when a file changes. A pack that fails to parse (`SHADER_PACK_INVALID`) or compile (`SHADER_PACK_COMPILE`) falls back to the project default or the built-in shading, prints the error and shows a red banner with the file and line.
+- Packs are GLSL, compiled at runtime, so `glslc` must be installed where the game runs (or named by `RUSTING_GLSLC`). Without a pack nothing changes, and a pack without composite passes adds no passes.
+- A `sky_lut` program (`#rusting sky_lut 1`, `void sky_lut(SkyLutInput i, inout vec3 color)`) draws the sky into a 256 x 128 mipmapped equirectangular image every frame; with a procedural sky and no environment texture it replaces the sky bake as the environment map. GPU timing shows it as `SkyLut`.
+- Surface fragment, sky, clouds and fog hooks see the sky through `sky_access.glsl`: `RUSTING_SKY_LUT`, `sky_param(i)`, `sky_lut_at(dir)`, `sky_lut_lod(dir, lod)` and the engine's `sky.glsl` (`sky_radiance`, ...). Surface hooks also get `RUSTING_WATER_DEPTH` with `rusting_water_view_depth` and `rusting_water_floor_depth`, set by the built-in water and -1 elsewhere.
+- `ShaderWorld::params` (32 `[f32; 4]`, zero by default) reach every hook as `frame.params[i]` (`RUSTING_FRAME_PARAMS` is 32), for game values the engine does not know about.
+- `"clouds": {"fragment": "clouds.glsl", "scale": 0.5}` (or 0.25) runs the clouds file as a cloud layer: compiled with `RUSTING_CLOUD_LAYER`, it defines `void cloud_layer(CloudLayerInput i, inout vec4 layer)` and draws once per frame into its own image at that fraction of the screen, with last frame's layer in `cloud_layer_history(uv)` and `cloud_layer_previous_uv(direction)` for temporal reprojection. The sky composites it as `sky * layer.a + layer.rgb`. GPU timing shows the pass as `Clouds`, between `SkyLut` and `Scene`. Other `scale` values, or `scale` on another program, fail with `SHADER_PACK_INVALID`. Without `scale`, or at 1, nothing changes.
+- The cloud layer gets `vec4 cloud_noise(vec3 p)` (`RUSTING_CLOUD_NOISE`): a tiling 128^3 RGBA8 3D noise texture with Perlin-Worley in `r` and inverted Worley fbm at 4, 8 and 16 cells in `g`, `b`, `a`, for Nubis-style volumetric clouds. It is made once on the CPU at start (about 0.4 s on all cores) and takes 8 MB of GPU memory.
+- A composite pass can take `"when": [option ids]` and runs only while one of those options is on (a bool true, an enum past its first value, a slider above 0). `scene.set_composite_enabled(name, on)` and `scene.composite_enabled(name)` turn a pass off from game code; the setting lasts across option, preset and pack changes. A pass that is off records nothing, at scale 1 the image passes through, and with every pass off the chain adds no copy. A smaller pass that is off keeps its last image, so passes that read it with `composite_at` should carry the same `when`.
+- `ShaderWorld::sky_hidden` (false by default) skips the pack's cloud layer and `sky_lut` draws while no sky can be seen and keeps their last images; the cloud layer redraws without history once it is false again.
+- Pack options take an optional `hint` of at most 120 characters for menus (`PackOption.hint`).
+- A surface hook can dim the directional lights on its fragment, for cloud shadows, by setting `float rusting_sun_light` (1 by default, `RUSTING_SUN_LIGHT`); ambient, reflections and point and spot lights stay as they are. Surface hooks also get `cloud_noise` (1 without a cloud layer), so ground shadows can follow the clouds in the sky.
+- Fog shaders read the vertex color of the surface a ray ends on, such as baked light, as `FogInput.surface_color` (1 for the background; `RUSTING_FOG_SURFACE_COLOR`).
+- The F3 performance overlay lists the GPU total and every pass of at least 0.005 ms in frame order, with the scene's opaque, terrain, foliage and sky parts under `Scene` and the shadow cascades summed under `Shadow`. The window title still shows only the fps line.
+
+### Performance readouts
+
+- A game can show the performance numbers in a debug screen of its own. Insert the `PerfWanted` resource to measure as F3 does, without printing a `[rusting] perf` line; `PerfOverlay`, `GpuPassMs` (milliseconds per GPU pass and part, keyed `Shadow`, `Scene`, `Scene.terrain`, ...) and `GpuMemory` then update once a second. Insert `PerfOverlayByGame` to keep the engine's corner text off while the game draws it; F3 then leaves measuring to the game.
+- `GpuMemory` splits GPU memory into allocator blocks, used bytes, meshes and their pages, textures and the sun's shadow map, plus this process's device-local use and budget from `VK_EXT_memory_budget` (0 where the driver lacks it). The `[rusting] perf` line prints them as `VRAM ...`.
+- `GpuInfo` holds the device name, driver and Vulkan version, and `rusting_engine::VERSION` the engine version, for a game's about box or bug reports.
+
+### Rendering
+
+- Opaque draws go front to back: batches of one material group sort by the camera's distance to their nearest object, in buckets that grow with distance (`src/rendering/draw_order.rs`), and instanced batches stay one draw. The order no longer depends on the order meshes were made in, which could change from run to run with meshes built on worker threads. A voxel forest at sunset went from 3.55-3.94 ms to 2.52-2.54 ms GPU p50 at 1080p, and its `Scene.opaque` pass from 2.45-2.86 to 1.59-1.70 ms. The order is sorted again when objects are added or removed, or after the camera moves 8 m. Captures can differ slightly where two opaque surfaces meet at equal depth.
+
+### Shadows
+
+- `Mask` materials cast alpha-tested shadows: the shadow pass drops texels where base colour texture alpha times material and vertex alpha is below `alpha_cutoff`, at the main pass's uv, so leaves and other cutout textures cast dappled shadows instead of solid blocks. Shader pack `shadow` and `vertex` hooks get a masked variant too. `Blend` materials still cast nothing, and `Opaque` ones keep the depth-only pass.
+- Soft shadows harden at contact: a blocker search over 16 shadow texels picks a filter radius from 1 texel where the caster touches the receiver to 3 texels a few metres from it (sun shadows; spot and point light shadows use 1.5), then 12 Poisson taps turned per pixel. Fully lit pixels stop after the search, so open ground costs less than the old 3 x 3 filter. `set_hard_shadows(true)` still gives one crisp tap. Shadow edges differ slightly from 2.6.1 in captures.
+- `RenderSettings::shadow_distance` (metres, 0 keeps the reach of `shadows`) and `shadow_cascades` (1 to 4, 0 keeps the count of `shadows`) set how far the sun's shadow reaches and how many cascades cover it. The shadow fades out over the last fifth of the distance.
+- `Surface.subsurface` (`vec4`, at the end of the struct, zero by default; `RUSTING_SURFACE_SUBSURFACE` is defined) lets directional light through thin surfaces such as leaves: `rgb` is the tint and `a` the thickness in metres used to look up the shadow behind the surface. Point and spot lights ignore it. Surface shaders and pack hooks that build a `Surface` with its constructor must add the new last field.
+
+## [2.6.1] - 2026-10-18
+
+Fixes for problems found while building a game on 2.6.0: game code can now build, draw and free its own meshes, read raw mouse movement for mouse look, and test that look in scenarios, and `rusting new` says which engine a new game uses. Materials can be double-sided, scenes with many objects record their draws several times faster, fog can follow the day and night light, scenarios report more and show progress, and the networking helpers can time, rebase and simulate each link on its own. The editor gets three fixes left over from the code audit.
+
+Save files and game code from 2.6.0 work unchanged, and 2.6.0 scenes still load, with four differences. Scenes saved by 2.6.1 use scene format 12, which 2.6.0 cannot open. Imported glTF materials marked `doubleSided`, which Blender sets by default, now draw their back faces. Simulated network conditions now give different delays and losses for the same seed, so tests that check exact lag timings may need new values. On a loopback session, unreliable messages now arrive after that poll's reliable messages instead of in send order, so do not rely on their order against reliable messages.
+
+### Game code
+
+- Game code can now draw meshes it builds itself, such as terrain chunks: `scene.create_mesh(mesh)` registers a mesh, `scene.spawn_mesh(name, transform, mesh, material)` shows it, and `scene.edit_mesh(handle, |mesh| ...)` changes it in place so every object using it updates on the next frame. `rusting docs show api/MeshAsset` explains the fields, including that a vertex color tints the material.
+- `scene.mouse_motion()` gives the raw mouse movement since the last frame, for a game's own mouse look. It keeps counting while the cursor is captured.
+- `scene.remove_mesh(handle)` frees a mesh made with `create_mesh`, such as a terrain chunk that went out of range. Its GPU copy is dropped on the next frame. It returns `false` for an unknown handle, a built-in shape or a mesh loaded from a file. An object still drawing a removed mesh shows the fallback cube, so despawn those objects first.
+- A project can set its random seed in `project.json` with `"seed": 42`. `rusting run` takes `--seed` or `RUSTING_SEED` first, then `project.json`, then a seed the game's plugin sets, then 0. Under `rusting test` a scenario's own `seed` wins, then `--seed`, then `project.json`, then 0; a seed the plugin sets does not apply there. So `rusting test --seed N` now takes effect for scenarios with no `seed`; 2.6.0 accepted it and changed nothing.
+- The menus and UI guide (`rusting docs show guide/menus-and-ui`) now explains where to keep save files: `rusting_engine::project::user_data_folder()` gives the folder, honours `RUSTING_USER_DATA`, and may not exist yet, so create it first. Under `rusting test` each scenario gets its own empty folder.
+
+### Rendering
+
+- Materials can be double-sided, for leaves, cloth, paper and thin walls seen from both sides. Set `"double_sided": true` on a material, tick Double Sided in the editor's material inspector, or import a glTF model whose material is marked `doubleSided`. Back faces are lit as if they faced the viewer, normal maps and water ripples work on both sides, the object casts shadows from both sides, and it works with every alpha mode. See-through double-sided objects draw their back faces first, so the front stays on top.
+- Blender exports materials as double-sided unless Backface Culling is ticked, and double-sided objects cost about twice as many triangles in shadows. Tick Backface Culling in Blender, or set `"double_sided": false`, for closed models such as rocks and buildings.
+- Fog can follow the scene's lighting: `ambient_tint` (0 to 1, default 0) on the fog multiplies its color by the ambient light plus each sun's light, weighted by how high that sun stands. At 1, fog dims as the sun sets and at night, so the game no longer has to change the fog color every frame.
+- Scenes with many objects cost far less CPU to draw. Meshes now share large blocks of GPU memory, and the renderer draws many objects with one call where the GPU allows it: shadows always, and the scene itself when culling is on (Auto turns it on from 128 objects). In the game that found these problems, recording a frame went from 3.0 ms to 0.8 ms, and each object now costs well under a microsecond of CPU instead of about 7. Memory freed by `remove_mesh` is reused once most of its block is empty.
+- The performance report counts real draw calls as `draw_calls` (`perf.render.draw_calls` in scenario reports, including budget runs), beside the objects drawn.
+
+### Networking
+
+- `RateLimit::allow_at(peer, tick, dt)` counts by the fixed tick instead of the wall clock, so the same messages on the same ticks get the same answers every run.
+- `Prediction::rebase(tick, state, step)` moves a predicted player to a new state, such as after a teleport or respawn, and replays the newer inputs on top of it. `Prediction::is_stale(acked_tick)` then tells which host replies are from before the move, and `Smoothing::teleport()` shows the move at once instead of gliding.
+- `NetSession::simulate_link(peer, conditions)` gives one peer its own simulated lag and loss. The host can exempt its own local client, or lag one player and not the others.
+- Simulated lag no longer makes one client wait behind another: reliable messages keep their order per connection, as over real TCP (one connection per client, or one shared through a relay). `Closed` arrives only after every message held before it.
+- On loopback, unreliable messages now travel on their own channel, so simulated `loss` really drops them, the same way on every run. They arrive after that poll's reliable messages instead of in send order. Through a relay they are still sent reliably. An unreliable message never arrives after its sender's `Disconnected` or the host's `Closed`.
+- Each link draws its simulated delays and losses from its own random stream, so the exact timings for a given seed differ from 2.6.0.
+
+### Editor
+
+- The Hierarchy panel no longer rebuilds its tree every frame, only when an object is added, removed, renamed or moved to another parent, so big scenes stay responsive while you work.
+- Hold Ctrl while dragging a face of a reflection probe's box to move only that face. The opposite face stays where it is, and the probe moves to stay in the middle of its box.
+- During Play, clicking an object simulated on the GPU, and focusing on it with F, now use where the object is drawn, not where it started.
+
+### Removed
+
+- `rusting_engine::input` (`InputState`, `set_mouse_capture`) and `rusting_engine::rendering::camera` (`camera_rotate` and its matrix helpers) are gone. They belonged to the old renderer removed in 1.4.0 and nothing used them. Use `RuntimeInput` and the ECS `Camera` instead.
+
+### Tests and tools
+
+- Scenarios can move the mouse: `{"tick": 5, "mouse_motion": [40, -10]}` feeds that movement to the game on that tick.
+- `rusting new` now prints which engine folder the new game builds against, and `--engine-path <folder>` picks a different engine checkout.
+- Passed `within` checks now say on which tick they passed: `passed_at_tick` in `rusting test --json` (single scenario and folder runs) and in `build/scenario-report.json`.
+- A `report` step records values without checking them: `{"tick": 200, "report": ["counter:xp", "Player/transform/position"]}` prints `tick 200: report: ...` and stores the values in the step's `actual`, with `null` for a missing object or field. It never fails and repeats through `until`.
+- Scenarios can check text on the game's screen: `{"expect": {"ui_text": "needs Workbench"}}` passes when that text is drawn, and `"exists": false` checks that it is not. A failure lists the texts that were drawn. Game code can read them too with `RuntimeUi::texts()`.
+- While no tick finishes for 5 seconds (a slow world load or a stuck tick), a scenario prints ``[rusting test] scenario `name`: still on tick N after S s`` every 5 seconds, so a slow test no longer looks stuck. The line goes to stderr, shows without `--stderr`, and is left out of failure output. In a debug build it suggests `rusting test --release`.
+- `rusting test` on a scenario folder runs several scenarios at once after the one build: a quarter of the CPUs, from 1 to 4, or the number given with `--jobs N`. `--jobs 1` runs them one at a time as before. Results stay in name order, and the result gives the count that ran at once as `jobs`. Scenarios with `budgets` run alone before the others, so their tick times are not skewed, and so do scenarios that use the GPU (`gpu`, `capture` or `expect_pixels`), since several Vulkan games at once can crash the driver. While several run at once, `--timeout` and the 60-second stall limit of those are multiplied by their number, the stall limit only when `RUSTING_TEST_STALL_SECS` is unset.
+- `rusting new` games build their own code at `opt-level = 1` in debug builds, so ticks and `rusting test` run several times faster (Hearthblock's first tick went from 50-99 s to 6-15 s, its debug `cargo test` from 45 s to 7 s) while debug assertions and overflow checks stay on, and release builds are incremental, rebuilding in about half the time (`rusting export` turns incremental off, so shipped games stay fully optimized). `rusting check` warns with `BUILD_PROFILE_SLOW` when an older game's `Cargo.toml` lacks these keys, and `rusting fix` adds only the missing ones, keeping values you set.
+- `rusting capture --game --release` builds the game optimized before capturing, as `rusting test --release` does, so a heavy game reaches a late tick in seconds. `--release` without `--game` is a usage error.
+- `rusting run --ticks N --out FILE` saves the end state to `FILE` (relative to the folder you run it from) instead of `build/final.rscene`, so several headless clients keep separate files. The file is replaced only when the run saves a new end state, so a crash keeps the old one. `--realtime` (or the `RUSTING_REALTIME` environment variable) runs one tick per fixed step of real time, for a headless client talking to a real-time server, and the reported time per tick leaves out the waits. Both flags need `--ticks`.
+- `rusting determinism` runs the debug build twice before comparing it with release, which adds one debug run of N ticks to the command's time (the build is reused). When the two debug runs already differ, or rerunning a pair to the divergent tick gives other hashes than their first runs, it says so: the game reads something that changes between runs into its world state (results from its own worker threads applied whenever they arrive, wall-clock time, network timing, unseeded randomness), and a compiler difference is not the cause. `data.divergence.kind` is `run_to_run` then and `configuration` for a debug-versus-release difference, and the second run's hashes go to `build/determinism/debug-repeat-<ticks>.json`, the reruns' to `<configuration>-rerun-<tick>.json`. When the rerun to the divergent tick finds no differing entity, the message says so, and an unnamed entity is named by its entity bits.
+- `rusting determinism` and `rusting bisect` pair objects spawned at runtime by name and position instead of blaming the first entity. Those objects get a fresh random scene ID every run, so nothing paired and the first entity in the list (often the ground) was blamed. Entities now pair by scene ID only when both runs have that ID, and otherwise the k-th entity with a name (or with no name) pairs with the k-th one, so an added scene entity that shifts entity bits is still the one named.
+
+## [2.6.0] - 2026-10-17
+
+A speed release. Projects build and start much sooner, big scenes load, save and spawn without slowing down, and physics, lighting and sound cost less each frame. Scenes, save files and game code from 2.5.7 work unchanged.
+
+### Faster builds and starts
+
+- After the first project, new projects build in seconds instead of minutes: all projects on a machine now share one engine build (a second project's first run: 2 minutes to 2 seconds, and about 40 times less disk space).
+- `rusting run`, `test` and `cook` skip work when nothing in the project changed since the last run.
+- `rusting validate` checks big scenes about 3 times faster.
+
+### Big scenes
+
+- Spawning many objects from game code stays fast: 100,000 objects spawn in a quarter of a second instead of 11 seconds.
+- Saving and loading big scenes is much faster, most of all scenes saved as a folder or with many different materials (saving 10,000 objects in a folder: 7 seconds to 0.03 seconds).
+- Loading textures and models in the background no longer makes physics stutter.
+- Name tags, HUD markers and 2D cameras that follow objects cost almost nothing, however big the scene.
+- Scenario tests run faster on big scenes.
+
+### Rendering and physics
+
+- Scenes with many lights render faster (256 lights: about 30% faster).
+- GPU physics is faster in crowded scenes and with large bodies such as floors and walls (100,000 falling cubes: about a third less time spent finding contacts).
+- In-game camera screens send about 4 times less data to the GPU.
+
+### Sound
+
+- Long music and sound files start playing at once, without a hitch, while the rest of the file decodes.
+
+### Tools
+
+- The slow-motion warning now also appears when the GPU, not the CPU, cannot keep up.
+- `render_bench` and `physics_bench` give more trustworthy numbers: CPU and GPU time per phase, upload size by kind, and a warning when another program is using the GPU.
+
+## [2.5.7] - 2026-10-16
+
+Weather and the sea: endless oceans with real waves and foam, clouds, rain on the camera lens, surfaces that get wet, scene-wide wind, and terrain heights read from an image. Also mouse wheel input, cursor capture, lighter textures and shadows for low settings, and a relay that is safe to run on the internet.
+
+Needs `rusting-core` 0.3.0, which adds `RuntimeInput::scroll`, `record_scroll` and `cursor_capture_asked` and the `RenderSettings::max_texture_size` field (a new public field, so struct literals of `RenderSettings` need `..Default::default()`).
 
 ### Added
 
-- Add Component picker redesign: a wide two-pane popup. The left list is grouped and searchable (search also matches descriptions); hovering a row shows its name, "What it does", "Use it for" and the Add button on the right. Blocked components show why. Help text lives in `placement::component_help`.
-- Hierarchy and Assets visual pass: both panels use the shared toolbar, search field with clear button, bordered list well and footer (object/selection count, file count or status message). Hierarchy icons are tinted by kind (camera, light, mesh).
-- `rusting.water` (`WaterBody`): water for seas, lakes and rivers. A rectangle of animated waves (three sine waves, deterministic) that dynamic bodies with sphere, box or capsule colliders float in, with a `flow_speed` current along `flow_direction` for rivers. Add it from Add Object > Environment and UI > Water. Use Fluid Block only for small splashing volumes.
-- `runtime::fluid_surface`: fluid is drawn as one smooth surface mesh (density grid plus marching tetrahedra, deterministic) in place of a sphere per particle. `rusting.fluid_block` `visible` now draws a translucent "Water" surface; the new `show_particles` adds the debug spheres. Code sets `FluidVolume::surface` to `FluidSurface::new(material)`. The mesh is rebuilt and uploaded every fixed tick (CPU), so keep fluids to a few thousand particles.
-- Materials have a name (Inspector Material section, Name field; imported glTF materials keep their glTF name). The Mesh Renderer combos show names, or "Material 1" and "Mesh 1" for unnamed ones, in place of hex ids. Cooked scenes are format 9; format 8 files still load.
-- Editor: the Project panel is now a Project Settings page. A category rail (Overview, Rendering, Display, Export, Diagnostics). Settings are cards with icon headers and switch and segmented controls. Anti-aliasing, shadow size and reflections are editable there, and Diagnostics shows stat tiles, a CPU frame bar and renderer counters. The shared pieces are in `gui_elements::kit`.
-- Editor: Add Component is a full-width button that opens a searchable picker, grouped into Physics, Environment, Engine, Game and User Interface. Inspector sections are bordered cards with an accent bar on the header.
-- Editor: the Console has a framed toolbar, striped rows, a level stripe, a source badge, monospace text and a repeat count badge.
-- Editor: lowering a material's Opacity below 1 switches an Opaque material to Blend, because Opaque ignores alpha.
-- Editor: Save Layout and Load Layout now also store the gizmo snap toggle and its move, rotate and scale increments. Older layout files load without changing snap.
-- `runtime::fluid`: a deterministic CPU particle fluid (position based fluids) with a box container, viscosity and a state hash. `FluidVolume` steps it every fixed tick. Set `FluidVolume::visual` to draw each particle as a mesh. Dynamic bodies with sphere, box or capsule colliders float and sink in it and displace it. The `rusting.fluid_block` scene component (a block of particles in a box) creates one. The particles are not saved in scenes (a block makes them again on load) but are in snapshots. Particle entities carry a `FluidParticle` marker, so the editor Hierarchy and Scene View picking skip them.
-
-- Scenario field `keep_going`: the run continues after a failed step and reports every failure.
-
-- `RenderSettings::reflections` (default on; a checkbox in the editor's Render Settings). Off skips screen-space reflections, and with no refractive material also the scene copy, mip chain and depth pyramid. Games call `GameScene::set_reflections(false)`.
-
-- `RUSTING_PERF=1` makes a windowed `rusting` game print one line per second to stderr: fps, CPU phase times, GPU pass times, draw/dispatch/triangle counts. It also prints the present mode and shows fps and frame time in the window title.
-
-- Editor: the Scene view's Snap button has a menu that sets the move, rotation and scale snap increments.
-- Editor: the Inspector shows game components this editor has no registration for as read-only JSON, and can remove them.
-- Editor: Home frames every rendered object; Numpad 1, 3 and 7 turn the Scene view to the front, right and top views around the orbit pivot, and with Ctrl to the back, left and bottom. Numpad 5 or the viewport menu's Orthographic switches the Scene view to an orthographic view that zooms with the wheel and Frame.
-- `rusting.fog` scene component: exponential height fog that fades distant surfaces and the sky into its color, thins out above a height, and brightens toward the sun.
-- `rusting.bloom` scene component: bright light glows into its surroundings before tone mapping, with a threshold, intensity and spread.
-- `rusting.ambient_occlusion` scene component: screen-space ambient occlusion darkens ambient and sky light in creases and corners. Off on the Eco quality profile.
-- Editor: the Scene view's viewport menu switches fog, bloom and ambient occlusion off for editing; Play still draws them. A selected Fog shows its height as squares over the grid; drag them to set the fog's height and falloff.
-- Editor: a selected Render Bounds override shows face handles in the Scene view; drag them to resize the box or sphere. "Fit to Mesh" wraps it around the mesh again.
-- Editor: Add Component places Fog, Bloom and Ambient Occlusion on the scene's environment object, next to the other atmosphere settings.
-- Editor: the material inspector edits Transmission, IOR and Thickness; Add Object offers a Reflection Probe, whose box shows in the Scene view, picks it on click, and resizes by dragging its face handles; the environment map's texture field lists loaded textures.
-- `rusting.reflection_probe` scene component: surfaces inside its box reflect the scene as seen from the probe, projected onto the box walls, in place of the environment map. Overlapping probes blend; up to four are used. Probes are captured when added or changed.
-- Screen-space reflections: smooth surfaces (roughness under 0.5) and glass reflect the scene on screen, falling back to the sky or environment map where the ray leaves the screen. Off on the Eco quality profile.
-- Refractive glass: materials take `transmission`, `ior` and `thickness`. Transmissive surfaces bend, blur (by roughness) and tint what is behind them.
-- `rusting.environment_map` scene component: an equirectangular sky image lights the scene and shows in reflections. Smooth metals mirror it; rough ones see a blurred version.
-- Player and platformer controllers ride moving platforms and stop rising when they hit a ceiling.
-- `samples/core_defense`: a top-down turret shooter aimed with the mouse, built with the `rusting` CLI alone, with four scenarios.
-- `GameScene::pointer_ray` returns the ray through the mouse cursor; `GameObject::rotation` and `GameObject::scale` read an object's rotation and scale.
-- `samples/putt_course`: a mini golf hole with a rolling physics ball, a charged putt aimed with the mouse and a sensor cup, built with the `rusting` CLI alone, with four scenarios.
-- `GameScene::counter_value`, `add_to_counter` and `counter_complete` read, change and test a counter by name in one call.
-- `samples/lantern_grid`: a lights-out puzzle played with mouse clicks, built with the `rusting` CLI alone, with two scenarios.
-- `GameScene::color`, `set_color` and `set_emissive` read and change one object's material color without recoloring objects that share it.
-- `samples/snake_trail`: a snake game on a tile-map arena, built with the `rusting` CLI alone, with three scenarios.
-- `GameScene::set_counter` sets a counter to a value.
-- `samples/night_vault`: a third-person stealth game with patrolling guards, view cones and an alert meter, built with the `rusting` CLI alone, with three scenarios.
-- The third-person camera stops in front of walls behind the player instead of going through them.
-- `GameScene::load_scene` switches to another scene file of the project, for levels and menus.
-- `skills/rusting-game/SKILL.md`: a skill file that teaches LLM agents to build and test games on the engine.
-- `GameScene::random` draws a value from the run's seed and the fixed tick, so scenarios repeat.
-- Editor: the Tile Painter has Rectangle, Line and Fill tools, and outlines the cell under the pointer or the dragged rectangle or line in the Scene View. Fill stays inside the grid's used area. `TileMap::fill_rect`, `TileMap::fill_line` and `TileMap::fill` do the same from code.
-- Editor: the Tile Painter picks its brush from a palette of swatches in each tile's color instead of a drop-down.
-- Editor: D, R, L and B pick the Tile Painter's Paint, Rectangle, Line and Fill tools while a brush is active, as in Godot. They are rebindable.
-- Editor: hovering a reflected Inspector field's label shows the field's description from its `doc` hint; a nested struct, list or map shows it on its group header.
-- Editor: the reflected Inspector adds and removes entries of string-keyed map fields, such as a tile map's tiles.
-- Editor: the Project area shows the resolved quality profile, marked "(Auto)" when Auto picked it, and the number of loaded LOD groups.
-- Editor: Numpad 9 turns the Scene view to look at the orbit pivot from the opposite side, as in Blender.
-- Editor: a point light's Scene view shape is a circle facing the view, as in Blender, in place of three crossed circles.
-- Editor: every shortcut can have a second key, set in the Keyboard Shortcuts area and removed with a right-click, as Blender deletes with both X and Delete. Redo also answers Ctrl+Y by default.
-- Scenario `pointer` step: places the mouse cursor at a point of the view, given as fractions of its size.
-- `samples/brick_bounce`: a 2D brick breaker built with the `rusting` CLI alone, with a bouncing dynamic ball, a steered paddle and four scenarios.
-- `GameScene::linear_velocity` reads a body's velocity.
-- `samples/crate_keeper`: a top-down crate-pushing puzzle built with the `rusting` CLI alone, on a tile map grid, with three scenarios.
-- `GameScene::tile` and `GameScene::set_tile` read and write the `rusting.tile_map` cell under a world position.
-- Scenario `tolerance` applies to every number in an array or object, so a position can be checked with `equals` and a tolerance.
-- `samples/tower_topple`: a first-person block-toppling game built with the `rusting` CLI alone, where thrown balls knock towers and a pyramid off their stands, with three scenarios.
-- `GameScene::camera_ray` returns the active camera's position and forward direction; `GameScene::set_body_kind` switches a body between fixed, dynamic and kinematic; `GameScene::restart` reloads the starting scene and reruns `once` setup.
-- `samples/ember_arena`: a third-person arena survival game built with the `rusting` CLI alone, lit by fog, bloom, ambient occlusion and point lights, with three scenarios.
-- `GameScene::spawn_copy` copies a template object and its children; `GameScene::in_class` lists the objects in a class.
-- `rusting scene patch`: registered components may also be partial; missing fields take their defaults.
-- `samples/sky_hop`: a 2D platformer built with the `rusting` CLI alone, with four scenarios including an input-only full clear.
-- `samples/target_range`: a first-person shooting gallery built with the `rusting` CLI alone, with three scenarios.
-- `rusting.input_action` scene component: binds a named action to keys and mouse buttons (`{"action": "fire", "inputs": ["MouseLeft", "KeyF"]}`).
-- `GameScene::pressed`, `held`, `raycast`, `aim`, `despawn`, `set_visible` and `trigger`, and the `RayHit` type.
-- Scenario expectations take `"exists": false` to check that an object is gone.
-- `rusting test` runs every scenario in a folder, or in `tests/` when given no scenario.
-- `rusting new` writes a `.gitignore`.
-- `samples/hammer_run`: a third-person obstacle course built with the `rusting` CLI alone, with three scenarios. It is the first dogfooding game for the agent workflow.
-- `rusting new` writes an `AGENTS.md` into the project: the files, the CLI workflow, scene basics and the game code API, so an agent can build the game without reading the engine source.
-- `rusting scene patch`: built-in sections and their fields may be partial; missing fields take their defaults. Operations and a created entity's `parent` may name an entity by its unique name instead of its ID.
-- Scenario `within`: an `expect` step passes on the first tick through `within` where it holds, for things whose exact tick a test cannot know.
-- `rusting check`, `validate`, `cook`, `run`, `determinism`, `test`, `project inspect` and `asset list` default the project root to the current folder.
-- `rusting scene patch` has a `set_scene` operation that changes scene-level fields such as the name, render settings and simulation settings.
-- Scenario `set` steps write a transform or component value before a tick runs, so a test can place the player or fill a counter instead of replaying inputs to get there.
-- `GameScene::counter(name)` reads and changes a `rusting.counter` by name.
-- `rusting run --ticks N` saves the scene as it stands after the last tick to `build/final.rscene`, so `rusting scene query` can inspect the end state.
-- `GameScene::touching(name)` lists the objects touching a named object in the last physics step, and `GameScene::world()` gives game code the ECS world.
-- Reduced-coordinate articulations (`rusting.articulation`): on a root body, it solves the `Fixed`, `Hinge`, `Slider`, and `BallSocket` joints of its tree in joint space. Links never drift apart, hinge and slider limits hold exactly, and contacts on any link move the whole tree. The root floats when it is dynamic.
-- Breakable joints: `break_force` and `break_torque` on `rusting.joint`. When a step's load passes either one, the joint is removed and a `JointBroken` event reports the joint, its target, and the force and torque.
-- CPU physics joints (`rusting.joint`): fixed, hinge, slider, ball socket, cone twist, distance, spring, and a generic six-axis joint whose axes are locked, free, or limited, each with an optional spring and motor. A joint links a body to another body or to the world, and jointed bodies do not collide unless `collide_connected` is set. See "Physics: CPU and GPU" in `docs/concepts.md`.
-- Project templates for a 3D first-person game, a 3D third-person game, and a physics sandbox (`rusting new --template first-person|third-person|sandbox`), next to the 2D platformer. The editor's Create Project form has a Template picker for every template.
-- `PlayerController` third-person mode: `camera_distance` above 0 orbits the child camera behind the body around a point `camera_height` above its center.
-- Optional `rusting-script` crate: sandboxed WebAssembly scripts on objects (`rusting.script` component), run by the Wasmi interpreter with fuel and memory limits. Scripts read and write reflected component fields and the transform, find objects by name, and read input actions. See `docs/scripting.md`.
-- Edit-to-running-game latency test (`tests/iteration_latency.rs`, ignored) for the starter template, with a documented target of 3 seconds for an incremental Debug build after a Rust edit. Measured 0.85 seconds; see `docs/dev-environment.md` "Iteration speed".
-- **Reload Code** in the editor while a game runs: the game saves its objects, the editor rebuilds the Rust code, and the game starts again from the saved objects, so a changed system runs on the same scene. Startup systems and `once` blocks do not run again. If a saved component no longer fits its changed type, the game starts clean and the Console says why.
-- Scenes can contain other scenes, like prefabs. The `rusting.scene_instance` component places a saved scene under an object when the scene loads, with stable IDs and entity references pointed at the copies. Text saves keep only the link; cooked scenes include the placed objects. Instances can nest, and a scene that contains itself fails to load.
-- Changes to the objects of a scene instance are saved as overrides: only the changed fields, per object. Everything else follows later edits to the source scene. Deleted objects stay deleted, and objects added under an instance are kept.
-- Scene variants: **New Variant** in the Assets menu of a `.rscene` file (or `save_scene_variant` in Rust) writes a scene that inherits another one. The variant's changes and a level's changes to a placed variant both save as overrides and stack on top of the base.
-- Instance actions in the Hierarchy right-click menu: Revert Object, Revert Instance, Apply to Source (other instances of the scene keep their own changes), and Unpack Completely, all with undo (`edit_instance` in Rust).
-- Signals: named Rust handlers (`App::add_signal_handler`) connected per entity (`Connections`, `App::connect`) answer typed `EntityEvent`s and component additions and removals. Connections survive snapshots and replays, and scenes save them as `rusting.connections`, checked when a game loads the scene.
-- Fast class lookups: `ClassIndex` (or `App::class_members`) lists the objects in a class, the engine's groups and tags, without scanning the scene.
-- `SceneTree`, a system parameter for finding objects by name, by child name or `Arm/Hand` path, and by class. It returns entities, and your own queries read the components.
-- Game code places scenes at runtime: `AssetServer::load_prefab` returns a `Handle<Prefab>`, and `spawn_prefab(world, handle, transform)` adds a copy with repeatable IDs.
-- The editor's Assets panel places a scene in the open one by double-click or `Instance in Scene`, with undo.
-- Render Settings can now change anti-aliasing (Auto, Off, MSAA 2x, MSAA 4x) and shadow quality (Auto, Low, Medium, High) while the editor runs. `RenderSettings` has the matching `antialiasing` and `shadows` fields.
-- Data assets, like Godot resources: a type that implements `DataAsset` and is registered with `App::register_data_asset` saves as a `.rdata` file. `AssetServer::load_data` shares one copy per file, and `Handle` fields in components and in other data assets save as paths. The editor's Assets panel creates them with **New** and edits them in the Inspector.
-- Unique data assets: a data asset reference can keep its own copy, saved inside the object as `{"$data": value}` instead of a file path. Each copy loads separately, so objects and prefab instances never share it. The Inspector's `Unique` choice copies a file's values into the object, and `AssetServer::duplicate_data` does the same in game code.
-- Data assets hot reload: a running game reads a changed `.rdata` file again within half a second, into the handles it already has. A broken file keeps its last values and reports the error.
-- Add Object has an **Environment and UI** category that creates a World Environment (sky, ambient light and tone mapping) or a HUD Element as its own object.
-- The editor shows `rusting.tile_map` tiles and the `rusting.background` color while editing, not only in Play. Clicking a tile selects its tile map; tiles never appear in the Hierarchy or the saved scene.
-- Tile Painter: select a tile map and pick a brush in the Inspector, then click or drag in the Scene View to paint or erase cells. Each stroke is one Undo step, and the map grows to fit cells painted past its edge. `TileMap::cell`, `cell_at` and `set_cell` do the same from code.
-- The File and Edit menus show the key bound to Save Scene, Undo and Redo next to each entry.
-- `GameScene::snapshot` and `restore` save and bring back the scene mid-game, with velocities, sleep and solver state.
-- `GameScene::reset_body`, `set_angular_velocity`, `angular_velocity`, `set_look`, `initial` (the starting transform, color and body kind) and `state_hash(class)`.
-- The prelude exports `Entity`, `World`, `Name`, `RigidBody`, `PlayerController`, `PhysicsWorld`, `GameSnapshot` and `InitialState`.
-- Scenario `log` steps record a value, every tick with `until`, and `rusting test --json` lists them. `rusting run --ticks N --json` reports `timings.headless_ms_per_tick`.
-- Materials have `uv_scale` and `uv_offset`, so a texture can repeat across a long floor instead of stretching.
-- `PlayerController` has `max_slope`, `max_step_height` and `push_bodies`; `PhysicsWorld::move_character_on_foot` walks with the first two.
+- `rusting.wind` blows over the whole scene: foliage and swaying materials lean in it without a force field, physics bodies ignore it, and particles feel it times their emitter's new `wind_factor`.
+- `GameScene::bone_world(object, bone)` gives a named bone's world matrix after the latest animation step, so game code can attach a held object to a hand.
+- `rusting.heightfield` loads its heights from a 16-bit PNG or `.r16`/`.raw` file with `image` and `height_scale`, so big terrains stay out of the scene file.
+- The quality profile thins `rusting.foliage`: Eco draws 30% of each scatter and Balanced 60%, keeping the first copies.
+- `rusting.foliage` on the parent of a multi-part model (a palm's trunk and leaves) scatters the whole model, each part keeping its place on every copy.
+- `GameScene::children(name)` lists the names of a node's children, so game code can tint or hide a model part by part.
+- A copy of a copy (`spawn_copy` of a spawned shark) now animates its own bones and skin: copied children are named `"<copy>/<bone>"`, not `"<copy>/<old copy>/<bone>"`.
+- `GameScene::scroll_delta()` returns the mouse wheel lines turned since the last frame, or in a tick function since the last tick, for hotbars and zoom.
+- `rusting test` on a scenario folder cooks and builds the game once, then runs every scenario with that build, instead of running `cargo build` before each one. The result gives the build time as `build_ms`.
+- `rusting.water` and `WaterShading` take `crest_foam`: the crests of steep Gerstner waves turn white where the waves pinch the surface together (the Jacobian of their sideways sway).
+- Water and ocean waves now move in the scene vertex shader. The surface grid uploads once instead of every tick, so large seas cost less CPU time.
+- `GameScene::set_max_texture_size(px)` and `RenderSettings::max_texture_size`: textures larger than the cap upload at half size until they fit, so a Low preset loads 2K textures at 1K.
+- `ShadowQuality` sets the sun's cascade count: 2 on Low, 3 on Medium and 4 on High, so low settings render fewer shadow views.
+- `GameScene::resolved_quality()`: the quality profile the renderer draws with, `Auto` resolved from the GPU, so game content can scale with it.
+- `rusting.render_layer` (`RenderLayer::Viewmodel`) on a mesh and `rusting.viewmodel_camera` (`ViewmodelCamera { vertical_fov_radians }`) on the active camera: held tools draw over the world with their own field of view and never poke into walls.
+- `ColorGrading::lens_droplets` (0 to 1): rain drops on the camera lens that bend the image behind them and fade after a few seconds, for first-person views in storms.
+- `GameScene::set_wetness(0..1)` and `MaterialAsset::wettable`: wettable materials darken and turn glossy as the global wetness rises, so decks, sails and rocks get wet in the rain, not only terrain.
+- `rusting.particle_blocker` boxes and the emitter option `blockers`: CPU particles die inside the boxes and below `rusting.heightfield` ground, so rain stops at roofs.
+- `rusting.procedural_sky` draws clouds: `cloud_cover` (0..1), `cloud_darkness` (0..1), `cloud_speed` (m/s) and `wind_direction` (world x, z). They glow at their edges toward the sun and hide its disc; lighting still sees the clear sky.
+- `rusting.water` `ocean: true` makes an endless sea: bodies float and players swim everywhere, and the surface grid follows the active camera with cells that grow away from it.
+- `rusting.water` takes `waves`, a list of Gerstner `OceanWave`s (`direction`, `length`, `height`, `steepness`) with sharp crests and analytic normals in place of the three sines, and `time`, a game clock for the waves in place of the fixed tick. `WaterBody::wave` returns the swayed surface and takes its time as `f64`, so waves keep their shape hours in; `WaterBody` is no longer `Copy`.
+- Scenario step `{"scroll": [dx, dy]}` turns the mouse wheel over the cursor, so a scenario can scroll an egui `ScrollArea` and `click` rows below the fold. Game code reads the wheel with `RuntimeInput::scroll()`, in lines, from the window too.
+- Scenario step `{"key": "SuperLeft"}` taps one key by its `KeyCode` name, for keys no action uses.
+- `GameScene::set_cursor_captured(bool)` grabs or frees the cursor; called on the frame Esc went down, it keeps the player controller from freeing the cursor for an Esc the game used. `set_mouse_look(.., true)` now grabs the cursor at once while the window has focus, and losing focus frees it.
 
 ### Changed
 
-- Objects with the same mesh and the same textures now share one instanced draw even when their materials differ in color, roughness, emissive and the like; those already travel per instance. Reflective (roughness below 0.5) materials and blended ones still batch apart. Same Shift went from 97 to 18 draws and from 0.56 to 0.22 ms of command recording.
-
-- `rusting scene patch` rejects a field a built-in section does not have (for example `intensity` on `directional_light`) and lists the known fields. It used to drop the field and fill the default silently. The schema default for `mesh_renderer.material` now lists `transmission`, `ior`, `thickness`, `uv_scale` and `uv_offset`.
-
-- Windowed games request at least 4 swapchain images (was 2). With 2 images the Wayland compositor throttled Immediate presentation. Same Shift went from 355 to 525 fps; render scale, antialiasing, shadows and quality made no difference before the change.
-
-- Blended materials use premultiplied alpha: reflections and highlights keep their full strength, so a transparent material works as clear glass.
-- The Inspector shows components by short name, such as "Sky Light" instead of `rusting.sky_light`, and sorts Add Component by that name.
-- Add Component no longer offers environment settings, HUD elements or tile maps on meshes, cameras, lights or each other. A second sky, ambient light, tone mapping or background is greyed out, because the renderer reads only the first.
-- Render Settings calls the device limit "Max MSAA".
-- New projects and the samples build dependencies optimized in debug builds, so CPU physics runs at full speed during development.
-- When fixed steps take longer than the time they simulate, the game runs in slow motion with one warning instead of freezing.
-- `set_body_kind` to `Kinematic` or `Fixed` stops the body.
+- The relay (`rusting relay`, `net::run_relay`) is safe to expose for `NetSession::host_room` / `join_room`: each connection writes through its own bounded queue, so a peer that stops reading is cut off instead of stalling every room; `RelayLimits` gains `max_rooms` (256), `max_clients_per_room` (64), `room_attempts_per_minute` (30, per address), `idle_timeout` (10 minutes after the handshake) and `send_queue` (1 MiB, split into equal shares per client on a host's connection); a sender over `bytes_per_second`, or a message larger than one second of it, is now dropped instead of slowed.
 
 ### Fixed
 
-- Fluid coupling visits bodies in spawn order. Removing a fluid volume removes its particle entities, a copied volume makes its own, and snapshots restore fluids.
-- Cooked scenes are format 8; format 7 files still load.
-- The game window no longer fails on a display that allows fewer than four swapchain images.
-- Fast bodies stop at the right distance from hull and mesh colliders. A player stepping onto a ledge measures the step at the contact point. A player with `push_bodies` off no longer lets crates fall through it.
-- The slow-motion clamp follows `time_scale` and never changes a replay.
-- `set_scene` refuses the scene root path. Whole numbers in scenario `equals` compare exactly. The headless ms-per-tick figure no longer includes scene load. `rusting schema` lists `pointer` under scenario steps and takes its `mesh_renderer` default from the material defaults.
+- `Orientation` keys and crossfades blend the short way round, so a key and its negated twin no longer collapse or spin the bone, and a crossfade eases a transform track only the old clip keys back to its rest value instead of leaving it where the old clip stopped.
+- `GameScene::raycast` and its variants hit a scene's colliders from the first fixed tick: loading a project, `load_scene` and `restart` build the physics bodies at once, with child colliders at their propagated poses, instead of after the first physics step.
+- `FrameTime::real_delta` reads the real frame time again while an overloaded app runs in slow motion; only the game clock is clamped to one fixed step. Replays record the real delta beside the clamped one (`ReplayFrame::real_nanos`).
 
-- `rusting export` copies the project's `scenes/` folder, so a game that loads a second scene works from the export.
+## [2.5.6] - 2026-10-14
 
-- `rusting test <project>` runs that project's `tests/` folder instead of reading the folder as a scenario, and scenario paths are looked up in the project folder first.
-- Editor: hidden objects no longer draw a camera or light shape, cannot be clicked in the Scene view, and are left out of Home framing.
-- Editor: a Tile Painter stroke that changes no cell no longer adds an Undo step.
-- A fast CPU body that hit a dynamic body stopped dead instead of pushing it, and a ball could slip between two boxes through the seam its center passed. The sweep now casts against colliders grown by the ball's radius and hands a dynamic target the momentum.
-- Hidden HUD elements, or elements under a hidden parent, are no longer drawn.
-- HUD text no longer wraps when it grows longer (a score going from "9" to "14"); lines break only at `\n`.
-- `GameScene::set_linear_velocity` wakes a sleeping body.
-- CPU physics repeats exactly after `restart` or `load_scene`. Bodies were solved in entity order, which changed on every reload.
-- Sleeping CPU bodies fall when the body under them is removed or moved.
-- Textures on the side faces of built-in cubes were upside down. Cube UVs now follow glTF, with the image's first row at the top. Projects that flipped their images to compensate must flip them back.
-- A scenario `expect` with tolerance 0 now passes for the value its failure message printed.
-- The player controller no longer climbs boxes taller than `max_step_height` on the round bottom of its capsule.
-- `rusting schema` describes scene texture slots as plain paths relative to the scene file.
-- Lights on hidden objects, or under a hidden parent, no longer light the scene.
-- Ambient light, sky light, tone mapping and the environment map now come from the entity with the lowest ID, as documented. The newest entity was used before.
-- Textures now have mipmaps, and samplers read them. Before, every texture was sampled at full resolution only, so distant textures shimmered.
-- Fixed a game crashing as it closed on Wayland when its runtime UI was on. The clipboard shut down after the window system connection had already closed.
+Better open worlds: sharper terrain without seams, trees that sway in the wind, grass and plants that follow the hills, nicer water, much cheaper shadows, and fast physics on big terrains. Games can save when they close and share a world seed over the network; the network protocol is now version 4, so update hosts, clients and relays together.
+
+### Added
+
+- `GameScene::exiting()`: game code gets one last update, with no tick and `exiting()` true, when the window closes, after `scene.quit()`, and when a dedicated server gets Ctrl+C or SIGTERM (a console close on Windows), so it can write its save. `App::run_exit_update` runs it for custom loops. `save_data` already writes through a temporary file and a rename.
+- `rusting run --bench --json` reports `passes_p50_ms`, and `rusting test --json` reports `perf.render.passes_ms`: GPU milliseconds per pass, per shadow cascade, and per opaque, terrain, foliage and sky part of the scene pass. The plain `bench:` output names the three costliest passes.
+- `rusting.terrain` layers take optional `normal` (OpenGL-style normal map), `roughness` (red channel) and `tiling` (metres per repeat; 0 uses the terrain's) fields. Layers without them look as before.
+- The net join handshake carries the host's world seed: the host calls `NetSession::set_seed(scene.seed())`, a client reads `NetSession::seed()` after joining, directly or through a relay, and applies it with the new `GameScene::set_seed`. The wire protocol is now version 4, so hosts, clients and relays must all be updated together.
+- `rusting.terrain` takes a terrain-wide `tint` (linear rgb, default white) multiplied into every layer and a `roughness` (default 1) that scales every layer's roughness. Changing only these two updates the terrain material without rebuilding chunk meshes, LOD groups or layer arrays, and `GameScene::set_terrain_look(name, tint, roughness)` sets them without a trip through JSON. A material color on a terrain now tints the blended layers instead of skewing the splat weights.
+- `net::interpolate::Track` blends a remote object's plain `(tick, position)` samples for games that send their own snapshots, without a replica or `NetTransform`: `push(tick, position)` in any order, `at(tick)` with a fractional tick, `newest()`.
+- `rusting asset import --linear` (and `reimport --linear`) marks an image as data and cooks `<name>-linear.rtexture` beside it, which the `reference` field points at. A plain image in a material's normal, metallic-roughness or occlusion slot now loads as linear data, from scene files and from the Inspector. `AssetServer::load_linear_texture` and `assets::cook_linear_texture` expose both paths.
+- `rusting.foliage` takes `conform` (default false), which sets each copy on the heightfield below it so a scatter follows hills, and `layers` (default empty), terrain layer indices a copy must stand on, such as grass but not sand. Copies are placed again when the object, heightfield or terrain changes.
+- Materials take a `sway` block (`MaterialSway`: `amplitude`, `frequency`, `height`) that bends every mesh using them in the `rusting.force_field` winds at its origin, in the vertex shader, so tree crowns sway for no CPU cost. `frequency` adds gusts phased by position and `height` keeps the base rooted while the crown curves. The editor material inspector shows it, and cooked scenes move to format version 11; version 10 scenes load without sway.
+- `rusting.water` takes optional `deep_color`, `depth_fade`, `shore_foam`, `ripples` and `ripple_length`: the surface fades to the deep color by the metres of water the view crosses, draws white foam where the ground nears the surface, and lights small scrolling waves. They read the opaque scene depth, which the renderer now copies for water even with reflections off. The defaults keep the plain one-color surface.
+- glTF import accepts `KHR_texture_transform`: the offset, rotation and scale the material's textures share are folded into `TEXCOORD_0`, and textures with different transforms fail with an error naming the material instead of `Unsupported extension`.
+- `PlayerController::step(physics, body, shape, position, input, water, floor_pose, dt)` runs one fixed tick of player movement from a `PlayerInput` (`forward`, `right`, `jump`, `jump_held`, `sprint`, `crouch`) instead of the global `player.*` actions, so a host can move every peer's body, and a client can replay its own inputs for prediction, with the same code as `rusting.player_controller`. It returns the dynamic body walked into as a `PlayerShove`.
+- `rusting asset bake-foliage <model> [--cards N] [--impostor] [--node NAME] [--tint RRGGBB] [--atlas PIXELS] [--out PATH]` bakes a tree's `MASK` or `BLEND` foliage into crossed alpha-tested cards with one RGBA atlas (4 triangles per card), and with `--impostor` a crossed-billboard impostor of the whole tree for the last LOD. It prints the source, foliage and card triangle counts. `foliage_bake::bake_foliage` exposes it to code.
+- `rusting asset import` and `asset reimport` record every file they cook beside a model (its `.rmesh` meshes, `.lodN.rmesh` levels, `.rlod` groups and `.rtexture` textures) in the new optional `.rmeta` field `cooked`, and the report's new `meshes` list gives each mesh's triangle count and its LOD triangle counts, so a 4-million-triangle tree shows up at import time instead of in a frame-time capture.
+- `rusting docs show api/net`, `api/net::predict`, `api/net::input`, `api/net::interpolate` and `api/procgen` list each module's public items, and every type, function, constant and type alias there has its own `api/<name>` page with its signature and docs, such as `api/PeerId`, `api/NetSession`, `api/fbm2` and `api/RandomStream`. `Smoothing::correct` now says which position to pass as `shown`.
+- `rusting lint` warns `LINT_TERRAIN_CHUNKS` when a terrain draws more than 300 chunks.
+
+### Changed
+
+- Cooldowns have their own namespace: `start_cooldown(name, ..)` keeps its end tick in the counter `cooldown:<name>`, so a counter called `name` is a separate value and a cooldown no longer overwrites it. Saves and scenarios load as before; a game that saved a cooldown through `save_counters` passes `cooldown:<name>` instead. Statuses keep their `<object>/<effect>` counters.
+- Terrain layers are kept in a mipmapped texture array at full size up to 2048 px (was a 2x2 atlas of tiles cut to 512 px) and sampled with anisotropic filtering, so distant terrain shows no grid lines or moiré at layer repeats.
+
+### Fixed
+
+- A `"realtime": true` scenario times `NetSession::simulate` delays from each tick's planned time instead of the wall clock, so a slow `capture` frame no longer changes the tick a held message arrives on, and a copy of the scenario without its captures sees the same arrivals.
+- `rusting asset reimport` of a glTF recooks its `.rtexture` files next to the project copy, not only its `.rmesh` files, so a changed source texture shows. Reimport without `--from` keeps a project copy that was edited after the last import instead of overwriting it with the recorded original, warns `ASSET_EDITED_COPY`, and records the copy as the new original.
+- The engine builds for Windows again: a zip permission literal had no integer type there.
+- Fixed-tick code (a game's `tick` function and every `FixedUpdate` system) sees `FrameTime::delta` equal to `fixed_delta`, so code that steps movement by `delta_seconds()` in a tick moves at the same speed whatever the frame rate. `Update` still sees the frame's time.
+- Terrain: the one-pixel vertical seam at the screen centre is gone. The atlas cropped each layer to 94% of its image, so every texture repeat drew a seam, and a camera at a round coordinate looking down an axis put one at the screen centre.
+- Terrain: layer `texture`, `normal` and `roughness` paths are relative to the scene file, like every other scene asset path. Paths relative to the project root still load, with a deprecation warning. `rusting lint` and `validate` report a missing layer image (`SCENE_MISSING_ASSET`) and a project-root path (`SCENE_TERRAIN_ROOT_PATH`), and a run logs once per path when a layer image fails to load instead of painting it white silently.
+
+### Performance
+
+- Foliage: wind lean of `rusting.foliage` copies runs in the scene and shadow vertex shaders instead of on the CPU, so a wind field no longer re-uploads every copy's transform each frame. `Custom` force fields no longer lean foliage.
+- Shadows: each cascade draws only the casters inside it, at the finest LOD level any of them shows on screen, instead of every caster at full detail. A dense test forest went from 13.2 ms to 2.4 ms of shadow GPU time, and from 25.8 ms to 17.1 ms per frame.
+- Terrain: `rusting.terrain` `chunk_cells` 0, the new default, picks the chunk size from the heightfield so a terrain makes at most about 150 chunks (a 1501 x 1501 island draws 144 instead of 2,209); an explicit size still wins.
+- CPU physics: `TriangleMesh` and `Heightfield` colliders test only the triangles under the other body's bounds through the mesh's box tree; one ball on a 1501 x 1501 heightfield steps in 0.05 ms instead of 40 ms.
+
+## [2.5.0] - 2026-10-12
+
+Concave dynamic colliders, terrain destruction and debris budgets, decals and physics-driven particles, 2D rendering in the scene, world-space text, golden-image tests, packed asset archives, mods, and procedural generation. Needs `rusting-core` 0.2.1.
+
+### Added
+
+- `ConvexDecomposition` (`rusting.convex_decomposition`) makes a `ConvexMesh` collider follow a concave mesh as decomposed hulls on the CPU solver, so concave props can be dynamic; scene-file settings are clamped to 128 voxels per axis and 256 hulls.
+- `runtime::decompose::decompose` splits a concave closed mesh into convex hulls (V-HACD-class approximate convex decomposition) for `ConvexMesh` colliders.
+- Physics suite scenes `BuoyancySort`, `SheetCatch` and `JellyRaft` check two-way coupling between rigid bodies, cloth, soft bodies and fluid
+- `SuiteScene::run_2d` runs 2D forms of the stacking, joint chain and CCD bullet suite scenes on plane-locked polygon bodies
+- `SlideSound::by_material` picks a slide or roll loop by the physics material or surface the body slides on
+- `TerrainFracture` digs a struck heightfield chunk out as a dynamic GPU slab
+- `TerrainFracture::pieces` cracks dug-out slabs into Voronoi pieces seeded by the scene's `RandomSeed` at the tick
+- GPU debris put to sleep by the GPU solver now counts as asleep, so the `DebrisBudget` can free dug terrain slabs at the cap
+- `TerrainFracture::refreeze` freezes debris that rests asleep on the terrain back into its heights and sends a `Refrozen` event
+- `DebrisAggregation` merges small sleeping debris into one static body per grid cell
+- Rendering: `Sprite::in_scene` draws a sprite inside the 3D scene, hidden by nearer meshes, instead of over it
+- Rendering: `rusting.camera_2d` follows a target with smoothing, limits, and a pixel-perfect mode
+- Rendering: impact and settle particles of 2D bodies draw in the 2D pass
+- Rendering: `rusting.particles_2d` draws particle emitters with the sprites in 2D canvas order
+- Rendering: sprites take a normal map that 2D lights shade
+- Rendering: 2D light occluder polygons cast shadows on sprites
+- Rendering: round 2D lights and a 2D ambient color light sprites in the sprite pass
+- Rendering: `rusting.sprite_animation` plays grid sprite sheets on a sprite, frame-stepped on the fixed tick
+- Rendering: 2D sprite pass draws `rusting.sprite` in canvas order over the frame, one instanced draw per image batch
+- Rendering: `rusting.sprite` component with canvas-ordered extraction and image batching for the 2D renderer
+- Rendering: the `[rusting] perf` line reports press-to-present input latency
+- Rendering: the FPS limiter keeps its cadence through late wakes and uneven frames instead of drifting slower
+- Rendering: `FrameGraph` schedules a frame's enabled passes, their barriers, and transient resource lifetimes
+- Tests: editor compositing golden image: the offscreen scene view drawn through egui under panels and overlays
+- Tests: `assert_shader_layout!` checks render upload types field by field against the shader-reflected blocks
+- Tests: a `shaders` CI job compiles every shader file with `glslc` through `scripts/check_shaders.sh`
+- Tests: resize, minimize to a zero-sized surface, and restore redraw the scene correctly at each size
+- Rendering: windows pick an RGBA swapchain on surfaces that prefer it instead of failing on a forced BGRA format
+- Tests: the renderer shuts down validation-clean with frames in flight; `rendering::validation_error_count` counts validation-layer errors
+- Tests: unloaded meshes and textures free their GPU data only after the frames that read them complete
+- Tests: the low-end capability baseline falls back to Eco, CPU culling, no MSAA and the Eco light budget, and draws the Eco image
+- Rendering: `CullingMode::Auto` draws scenes under 128 instances with no culling (was 64), the break-even measured on an RTX 3060
+- Tests: GPU bodies are culled where the GPU moved them, with no state read back
+- Rendering: `rusting.text` draws text in the world (signs, labels) with the built-in pixel font
+- Fluids: Granular fluid blocks draw an opaque sand surface instead of translucent water
+- Rendering: decals take a `roughness` painted with their coverage, so a dark decal can be a wet stain or a puddle that catches highlights
+- Tests: a golden-image test of every primitive's normals
+- Tests: a golden-image test of glTF texture channels and color spaces
+- Tests: a golden-image test of alpha mask and blend modes
+- Tests: a golden-image test of directional shadow depth
+- Tests: a golden-image test of PBR reference spheres
+- Tests: golden-image tests of the Linear, Reinhard and ACES tone mappers
+- Tests: every culling mode and path draws the same image as no culling
+- Tests: automatic culling bounds contain every vertex of the primitives and imported sample meshes
+- Tests: a culled CPU rigid body keeps falling off view and is drawn once it enters the view
+- Decals: `survive_fracture` moves a decal onto the nearest debris piece when its parent breaks, or removes it with the object
+- Particles: `on_fracture` bursts `impact_count` particles at the break point when an emitter's parent object fractures
+- Fracture: debris pieces keep the broken object's normals and texture coordinates on their outer faces
+- Soft blocks: `color` and `texture`, laid once on each side of the block and fixed to the particles
+- Release zips: an export preset with `"zip": true` zips the finished, signed and verified export folder into `<folder>.zip` beside it (stored, Unix modes kept, same bytes for the same folder); the export JSON reports `zip`.
+- Workshop and store hooks: `PlatformServices` gains `workshop_items`, `publish_workshop_item`, `owns_content` and `open_store_page`, each with a default (no workshop, all content owned, no store page), with matching `platform::` functions; games load subscribed workshop items with their `mods/` folder (`mods::load_mods_with`). Mod loading no longer follows linked folders inside a mod (a link loop hung the game), compares scenes field by field only in `rusting mod list` and only up to 4 MiB, and prints mod file names with control characters replaced
+- Mod conflicts: `rusting mod list` reports under `conflicts` each file more than one mod holds, and for scenes each entity and component field two mods changed differently; games print the conflicting files as they mount mods. `rusting mod pack` now needs `--out`, so `--confine` checks where it writes The scene comparison skips files that are not regular files of known size, so a mod scene linked to `/dev/zero` cannot hang it.
+- Mods: folders or `.rmod` archives with a `mod.json` (name, version, dependencies) in a game's `mods/` folder replace or add its assets and scenes, in a load order from `mods/load_order.json` or by name with dependencies first; `rusting mod pack` packs one and `rusting mod list` shows the order and the mods left out
+- Mesh generation: `meshgen::spline` (Catmull-Rom points), `extrude` (a profile swept along a path without twisting), `loft` (rings skinned into a closed mesh), and `ProcMesh::union`, `subtract` and `intersect`; `ProcMesh::glb` saves a mesh for a scene and `ProcMesh::asset` gives a flat-shaded asset that `TriangleMesh` and `ConvexMesh` colliders use
+- Generated level checks: a `scene_generators` entry's `checks` scenarios (such as an `explore` run that must reach every goal, or `invariants`) play on each new scene before it replaces the old one; a failure keeps the old scene and gives `GENERATED_SCENE_CHECK_FAILED`. `RunOptions.scene` runs a game on any scene
+- Scene generators: `scene_generators` in `project.json` name a project command that writes a scene from a seed and inputs; `rusting scene generate` reruns it only when the command, seed, inputs or watched files changed, checks the scene loads, journals the write, and refuses to overwrite hand edits without `--force`
+- The API audit test covers every type in the prelude: a new public method returning a borrow, or a prelude type gaining a lifetime parameter, fails the build's tests
+- Packed asset archives: export preset `pack: true` packs `assets/` and `scenes/` into `.rpak` files the game streams files from, with loose files still winning
+- `procgen`: seeded random streams, gradient noise with fractal layers, and Poisson-disk point scattering that give the same bits on every machine
+- `procgen` grid generators for tile maps and 3D grids: `cellular_caves`, `rooms_and_corridors` and `wave_function_collapse`, with `tile_rows` to fill a `TileMap`
+
+### Fixed
+
+- `rusting-core` 0.2.1: transforms with mirrored or flattened scale decompose without losing their matrix, and hierarchy cycle rejection is tested for deep, self and pre-existing cycles.
+- A body that loses its `PhysicsBody` component no longer keeps a stale `PhysicsId`, and a `PhysicsId` slot is retired at its last generation instead of wrapping, so old GPU events can never reach a newer body
+
+## [2.4.1] - 2026-10-10
+
+Fixes 2.4.0 builds: without the Vulkan SDK the cloth shader failed to compile, and the crates.io package needed a newer `rusting-core` than the one published.
+
+### Fixed
+
+- `rusting_engine` builds from crates.io again: it depends on `rusting-core` 0.2.0, which carries the 2D, light and render settings types 2.4.0 uses (crates.io still had 0.1.8)
+- The engine builds again without the Vulkan SDK: the cloth shader used a constant the bundled shader compiler cannot work out (`cloth.comp:23: global const initializers must be constant`)
+- `chacha20` is updated from the yanked 0.10.0 to 0.10.2
+
+---
+
+## [2.4.0] - 2026-10-10
+
+Rendering, deformable physics and multiplayer building blocks for larger games: modern shadows and post effects, soft bodies and cloth on the CPU and GPU, and replication, prediction and dedicated servers.
+
+### Added
+
+- Rendering: cascaded shadow maps for the directional light, so shadows stay sharp near the camera and still reach far away
+- Rendering: point lights can cast shadows (`PointLight::shadows`), and point and spot lights take a `radius` for softer, wider highlights from a glowing sphere
+- Rendering: clustered lighting for point and spot lights; a frame can now light up to 1024 local lights instead of 64
+- Rendering: `rusting.light_cookie` projects an image through a spot light's cone
+- Rendering: `rusting.auto_exposure` adapts exposure to the scene's measured brightness, like an eye adjusting
+- Rendering: `rusting.color_lut` applies a color grading lookup strip, `rusting.depth_of_field` adds lens blur and `rusting.motion_blur` adds camera motion blur
+- Rendering: `Antialiasing::Fxaa` and `Antialiasing::Taa` (temporal anti-aliasing with a jittered camera)
+- Rendering: `RenderSettings::upscale_sharpness` gives a `render_scale` below 1 an edge-preserving, sharpened upscale like FSR 1
+- Rendering: meshes carry vertex colors that tint the material; glTF `COLOR_0` is imported
+- Physics: XPBD soft bodies (`rusting.soft_block`) that keep their volume, push out of colliders, attach to rigid bodies both ways, tear when overstretched and draw with a skin of their outer faces
+- Physics: XPBD cloth (`rusting.cloth`) with wind, self-collision, pinning and tearing, drawn two-sided
+- Physics: `GpuCloth` and `GpuSoftBody` step cloth and soft bodies on the GPU with the same results bit for bit as the CPU reference; cloth floor contacts arrive as physics events
+- Physics: raycasts walk bounding-volume trees instead of testing every collider and triangle, with the same hits as before; `scene.raycast_only` hits only the named classes
+- Networking: `send_unreliable` and `broadcast_unreliable` send per-tick state over UDP beside the TCP connection, falling back to reliable sends where UDP cannot get through
+- Networking: remote procedure calls on scene objects (`net::rpc`), with a host, owner or anyone authority checked on the host
+- Networking: replicated spawning and component sync (`net::replicate`): marked objects send compact per-component changes against the last snapshot each client acknowledged, with chosen fields quantized
+- Networking: client-side prediction and reconciliation, clock synchronization, input tick offsets and a host-side input buffer that absorbs jitter and late inputs
+- Networking: a player lobby with ready checks and reconnects within a grace time
+- Networking: dedicated servers: `rusting run --server` (or `RUSTING_SERVER`) runs a game with no window or renderer and reports tick load
+- Networking: `NetSession::simulate` adds latency, jitter and loss for testing, `NetSession::stats` counts traffic, and loopback sessions run in one process for tests
+- Networking: per-peer rate limits (`RateLimit`) for client messages
+- Docs & tools: a migration guide for Godot users, a plugin authoring guide, generated reference pages for every reflected type, and a release notes process in `RELEASE.md`
+- `rusting.rope` hangs a rope of small bodies between two bodies, or a body and a world point; it goes slack, never stretches past its length, and tows what it is tied to.
+- `rusting.mesh_surfaces` gives each triangle of a TriangleMesh collider its own friction, restitution and sound material, like heightfield cells.
+- `GameScene::set_gpu_axis_lock` (`PhysicsSettings::gpu_locks`) locks every GPU body to chosen axes, so a 2D game's GPU bodies stay in its plane.
+- 2D joints and queries are covered by a test: a ball socket on an axis-locked body acts as a 2D pin joint, and rays and overlaps hit `Polygon` and `Chain` colliders.
+- `ColliderShape::Polygon` and `ColliderShape::Chain` collide with a `rusting.polygon` 2D outline extruded along Z: a convex polygon any body may use, or a static segment chain for 2D ground.
+- `rusting.axis_lock` locks a CPU body's movement along or rotation around chosen world axes, Godot style; `AxisLock::PLANE_XY` keeps a 2D body in the XY plane exactly.
+- `FieldKind::Custom` force fields call a plain Rust function the game registers by name with `App::add_force_field_function`; it gets a `FieldSample` (offset, velocity, time, direction) and returns the push per unit strength
+- `rusting.force_field` now pushes GPU bodies too: the CPU step's field sensors upload each frame and `physics.comp` adds their push next to gravity, with wind gusts from a new bit-exact `sim_sin_cos`
+- The CPU contact solver solves independent islands on all cores, bit-identical to one worker
+- Heightfield `cells` and `surfaces`: each grid cell can have its own friction, restitution and sound material name (an ice patch on grass); `Contact::surface` says which one a contact touched
+- Compound bodies: solid collider children of a dynamic CPU body move with it as one body; contacts and ray hits on them report the parent (they were fixed in place before)
+- The CPU physics narrow phase runs on all cores; results stay bit-identical for any worker count
+- `ColliderShape::Heightfield` with a `rusting.heightfield` height grid: static uneven ground for CPU bodies and the player; `Heightfield::mesh()` draws the same surface
+- `rusting.force_field`: directional, radial, vortex and turbulent wind fields that push dynamic CPU bodies inside a sensor collider
+- `rusting.physics_material`: a named collider surface with friction and restitution combine modes (Default, Average, Min, Multiply, Max); `SoundCue::with_material` plays a cue only on touches of that surface
+- `rusting.vehicle`: raycast cars with spring-damper suspension, a slip-curve tire model, an open differential, an engine with flywheel inertia and an automatic gearbox; `player_input` drives one with the player actions
+- Regression tests for ten-box stacks settling with cached contacts for a hit waking a whole sleeping stack, and for bullets against thin box, hull, triangle and dynamic walls.
+- `GameScene::generate_ragdoll(name, total_mass)` and `runtime::ragdoll_bones` build ragdoll bones from a character's skinned joints.
+- A `PlayerController` on a dynamic `RigidBody` is moved by the solver: walking steers it with a bounded force, jumps set its vertical speed, and it never tips over.
+- Ground snapping for `PlayerController`: a walking player stays on the ground down ramps and steps no taller than `max_step_height` instead of hopping off them, so it can jump all the way down. `PhysicsWorld::snap_to_floor` gives the same snap to custom character code.
+- `PhysicsSettings::substeps` and `ProjectRunner::set_physics_substeps` split each CPU physics step into equal substeps. Eight substeps hold a 20-link joint chain with a 50:1 tip within 2 cm, where one stretched it by metres; four rest 100 kg on 1 kg. Trade-off table in docs/concepts.md.
+- `rusting.gravity_volume`: a sensor body that replaces gravity for CPU bodies inside it (zero-g rooms, wind tunnels, `toward_center` planets), with `priority` for overlaps
+- Scenario reports give the game process's memory: `perf.rss_mb` at the end and `perf.rss_mb_peak` (Linux)
+- Agent benchmark new-game tasks `lift-new-game` (a lift moving up and down that counts trips), `seed-planter-new-game` (numbered copies of a template, one a second) and `lamp-switch-new-game` (a key toggles a point light)
+- Agent benchmark task `crate-plate-new-game`: a new-game task where pushing a crate onto a pressure plate opens a door
+- Agent benchmark task `starter-flag-gate`: a bug-fix task on the starter template where the flag wins before the coins are collected
+- Agent benchmark task `cube-quarter-turn`: a feature task on the 3d template where a key press turns the cube a quarter turn over 0.25 s
+- Kill plane: `scene.set_kill_y(Some(y))` despawns loose dynamic CPU bodies that fall below `y`, with their children, and `scene.fell_out()` names them
+- Agent benchmark task `swarm-glass-enemies`: a performance task where a blended enemy material makes every enemy its own draw call, held to a `max_draws` budget
+- Agent benchmark task `jump-new-game`: a new-game task with a ball that jumps only while it rests on the floor
+- Agent benchmark task `sandbox-reset`: a feature task that puts the physics sandbox's pile back at its start without reloading
+- Agent benchmark task `sandbox-hail`: a performance task where over-detailed spheres break a `max_triangles` budget
+- Agent benchmark task `fps-double-jump`: a bug-fix task where the first-person player can jump again in mid-air
+- Agent benchmark task `tps-coins`: a feature task that adds three collectable coins to the third-person template
+- `GameScene::rebind_device` rebinds an action on one device (keyboard and mouse, or gamepad) and keeps its other inputs; the `{binding:action}` HUD button now keeps the gamepad button when the player picks a new key
+
+### Changed
+
+- The network protocol version is 3. 2.3.0 games cannot join 2.4.0 hosts or relays, or the other way round
+- `.rmesh` files have a version header; older files still load, with white vertex colors
+- `PointLight` gains `shadows` and `radius`, `SpotLight` gains `radius`, and `RenderSettings` gains `upscale_sharpness`; struct literals need the new fields (or `..Default::default()`)
+- `Antialiasing` has two new variants, `Fxaa` and `Taa`; an exhaustive `match` on it needs arms for them
+- `AxisLock` moved to `rusting_core::components`; `rusting_engine::runtime::AxisLock` still works. A struct literal of `PhysicsSettings` needs the new `gpu_locks` field (or `..PhysicsSettings::default()`).
+- `ColliderShape` has two new variants, `Polygon` and `Chain`; an exhaustive `match` on it needs arms for them.
+- `ForceField` is no longer `Copy` (it gained `function: String`); write `..field.clone()` where you spread one field into another
+- A `.rlod` group may have at most 4 levels; loading one with more fails
+
+### Fixed
+
+- A CPU body asleep on the floor no longer drops out of `PhysicsWorld::contacts` and `GameScene::touching`; sleepers keep the contacts they fell asleep with
+- The over-the-shoulder camera stops at walls beside the shoulder instead of looking through them
+- Flat shading no longer breaks on alpha-tested materials or on degenerate triangles
+- Network handshakes have a deadline and a size cap, so a silent or oversized hello cannot hold up a host
+- The relay limits connections per address (per IPv6 /64), connection rate, total connections and read rate, keeps running after accept errors, and handles each handshake on its own thread
+- The host accepts a client's UDP datagrams only from the IP address of its TCP connection
+- Replication refuses messages from anyone but the host, for objects or components it does not replicate, or naming one object twice
+
+### Performance
+
+- Measured static props: 40,000 static entities cost 0.58 ms of CPU a tick in release (ignored test `static_props_cost_little_per_tick`), so no static flag is needed
+- LOD groups no longer double CPU render cost: an opaque object in a `.rlod` group is one instance, and its batch picks the level per object (2085 moving objects with two levels: 0.298 ms to 0.174 ms of render CPU a frame; 0.127 ms without LOD)
+
+### Known limits
+
+- Point lights cast shadows only in frames where no directional or spot light casts shadows
+- A rope has at most 256 beads
+
+---
+
+## [2.3.0] - 2026-10-10
+
+Follow-up to 2.2.0 from Rusting Raft: animated copies, cheaper moving objects and passwords for networking.
+
+### Added
+
+- Networking passwords: a host can require a password from joining clients, and `RUSTING_RELAY_TOKEN` makes `rusting relay` refuse hosts and clients without that token, so a relay can face the internet
+
+### Changed
+
+- `NetSession::host`, `host_on` and `join` take a password, and `host_room`, `join_room` and `run_relay` a relay token, as a new last argument. Pass `""` for none
+- The network protocol version is 2. 2.2.0 games cannot join 2.3.0 hosts or relays, or the other way round
+
+### Fixed
+
+- Copies of rigged or animated models (`spawn_copy`, spawn grids) now animate: animation tracks, skin joints, ragdolls and retargeting find the copy's own bones instead of standing in bind pose. Copies of unnamed templates still have unnamed children and cannot be found by path
+
+### Performance
+
+- The renderer patches moved instances in place instead of repacking every instance: with 10,000 objects, 0.15 ms instead of 0.98 ms a frame for instance preparation
+
+### Known limits
+
+- Network passwords and relay tokens travel in plain text, and the relay does not rate-limit wrong tokens
+
+---
+
+## [2.2.0] - 2026-10-10
+
+Engine features asked for while building the multiplayer raft game Rusting Raft.
+
+### Added
+
+- Networking: `rusting_engine::net::NetSession` hosts, joins by address, or joins through a relay by room code, with reliable, ordered messages over TCP. `rusting relay` runs the relay. See `guide/networking`
+- Swimming: a player controller with `swim_speed` above 0 swims in water, floats at the surface, dives while crouch is held and rises while jump is held
+- Turning platforms: players riding a kinematic floor turn with it, not only move with it
+- Hard shadows: `scene.set_hard_shadows(true)`, or Hard shadows in the editor's project settings, gives crisp, stair-stepped shadow edges
+- Flat shading on any mesh: `flat_shading` on a material, and on `rusting.water` for low-poly waves
+- Window title: `"window_title"` in `project.json`, or `scene.set_window_title`
+
+### Changed
+
+- New public fields: `MaterialAsset::flat_shading`, `WaterBody::flat_shading`, `RenderSettings::hard_shadows`, and `PlayerController::swim_speed`, `float_depth`, `swimming` and `floor_rotation`. Add `..Default::default()` to struct literals
+- Scene format 10 stores material flat shading. Version 9 cooked scenes still load; older engine builds cannot read the new files
+
+### Fixed
+
+- The scenario stall watchdog no longer ends a unit-test run during long GPU tests
+
+### Performance
+
+- Scenes with many moving objects: when objects only move, the renderable list updates them in place instead of being rebuilt. With 10,000 objects, one moving object costs 0.36 ms instead of 6.4 ms a frame, and all moving cost 1.6 ms instead of 9.8 ms
+
+### Known limits
+
+- Networking is TCP only, with no unreliable channel, replication, prediction or encryption
+- The renderer still repacks every instance when one object moves
+- 2D platforms carry riders by translation only
+
+---
+
+## [2.1.0] - 2026-10-09
+
+Engine features for the horror game FOREVER BEAR, and a large batch of tools for building games with an agent.
+
+### Added
+
+- Gameplay without code: state machines with timed, held-input and touch transitions, health and damage, status effects, cooldowns, loot tables, dialogue, capped spawners and spawn grids
+- Gameplay recipes: `rusting recipe apply` adds checkpoints, health, double jump, dash, inventory, day timer, pause menu, wave spawner or turret, each with a passing test
+- Nine new game templates: twin-stick, tower defense, roguelike, card game, rhythm, racing, top-down, puzzle, empty, plus tests in every existing template
+- Saves: versioned save slots for counters and objects, a save-slot list, and crash-safe writes
+- Localization: locale files, plural rules, translated HUD text and a missing-translation lint
+- HUD: themes from `assets/ui/theme.json`, scaling to any window, elements pinned over objects, dialogue boxes and rebindable controls with no code, and larger text for players who need it
+- Audio: bus effects (low-pass, reverb, distortion, compressor, EQ), reverb zones, Doppler, falloff curves, walls that muffle sound, streaming music, pitch, seek, reverse, voice limits, mute and solo, sliding and rolling sounds, and captions
+- Look: CRT and VHS screens, film grain, fog and color grading inside boxes, shadowed spot lights, text on 3D objects, camera shake, squash and stretch, hit flash and hit stop
+- Gameplay helpers: tweens, `look_at`, slow motion, waypoint paths, crouching, air jumps, camera zoom and view limits
+- Placeholder content: `rusting asset generate` makes meshes, textures, sprites and sound effects from a seed
+- Testing: an explorer bot, fuzzing, recording a play session as a test, bisecting two builds, coverage reports and weak-test detection
+- Many new `rusting lint` checks: missing objects, actions, files and translations, unreachable goals, text contrast and size, light budget, rounds with no ending
+- Agent tooling: an operation journal with `rusting log` and `rusting revert`, leases for parallel agents, scene merge for git, folder-form scenes, `--offline`, `--confine` and `--read-only`, and an agent benchmark
+- Performance reporting: CPU and GPU frame times, `rusting run --bench`, and an on-screen fps report under `RUSTING_PERF` (F3 toggles it)
+- Editor: the Agent area shows test results and can hold outside scene edits for review, entity by entity, with undo
+- Steam achievement and stat calls that do nothing yet, so games can call them today
+- Sample game `forever_bear_booth`; new guides on lighting, pitfalls and the cookbook
+
+### Changed
+
+- `runtime::spatialize` takes a fourth `Falloff` argument; pass `Falloff::default()` for the old curve
+- `runtime::hud_text` takes a third `Translations` argument; pass `None` for the old behaviour
+- `ObjectState` has a `transitions` field and no longer implements `Eq`; `CpuFrameTimings` has `update` and `post_update` fields. Add `..Default::default()` to struct literals
+- `Explore::goals` is `Vec<ExploreGoal>`; `"Coin".into()` still works
+- `resource_state_hash` takes `&mut World`
+- `rusting test` with one scenario leaves out state hashes; pass `--full` to keep them
+- Commands that write project files create a `.rusting/` folder, which git ignores on its own
+- Textured cylinders, cones and capsules map the full image height; a textured capsule appears flipped compared with earlier builds
+
+### Fixed
+
+- HUD buttons work from the keyboard and gamepad, and the HUD keeps its dark theme on a light desktop
+- Exported games find their assets and load scenes cooked by another engine build
+- Replays no longer diverge at tick 9 on every windowed recording
+- Screenshots blend UI the same way as the game window; goldens with translucent UI may need regenerating
+- Captions stay up for their whole time and hide while their sound is paused
+- Long soak tests no longer grow without limit, and a stalled test fails instead of hanging
+- Parallel runs of one project no longer fail at random while cooking the scene
+
+### Performance
+
+- Camera screens reuse the frame's physics: six screens cost about 3 ms instead of 113 ms
+- Large GPU bodies no longer stall the physics pass: 20.8 ms down to under 2 ms of GPU time in the benchmark, with identical results
+- Faster scenario checks, captures and color changes on large scenes
+
+### Known limits
+
+- Windows was checked under Wine only; gamepads, the save folder and real Windows hardware are not checked yet
+- Microphone input, video on textures and the real Steam backend are not done yet
+
+---
+
+## [2.0.3] - 2026-10-05
+
+### Added
+
+- Animation: keyframe clips that move, turn, scale, recolor or hide objects, with smooth blending between clips
+- Timeline in the editor: play, scrub and edit keys, with a record mode and full undo
+- Animated and skinned glTF models: bones, blend shapes and their clips now import and play
+- Animation state machine and blend spaces: switch and mix walk, run and other clips from game code
+- Animation layers: play a clip on top of another, like waving while walking
+- Root motion: walk clips move the character instead of sliding in place
+- Copy animations between differently built skeletons
+- IK: heads look at targets, hands and feet reach for things, feet stay on slopes and stairs
+- Ragdolls: characters go limp when hit hard and get back up, or stay physical and stagger when pushed
+- Particles: a new emitter with eleven ready presets (dust, leaves, snow, rain, sparks, smoke, fire, embers, fireflies, sparkle, confetti)
+- Particle editor in the Inspector with a live preview
+- Color grading and vignette, plus two new art presets: dark interior and bright stylized
+- Camera screens: show what another camera sees on a mesh, like CCTV monitors
+- Rounded cubes and capsules, and a ready-made simple character
+- Add a downloaded glTF model to a scene with one command
+- Skeletons show in the editor; click a bone to select it
+- New guides: Animation, Effects and Look and feel
+
+### Changed
+
+- Cylinders and cones look smooth
+
+### Fixed
+
+- Spheres were drawn inside out and looked badly lit
+- Adding a model to a scene no longer fails in some cases
+
+---
+
+## [2.0.2] - 2026-10-03
+
+### Added
+
+- Much better sound: panning, 3D sounds that follow objects, fades, music ducking and separate volume groups
+- Menus: buttons, settings screens and pause menus made with egui, usable with mouse, keyboard or gamepad
+- Gamepad support for moving, looking and menus
+- Saves: games can save and load files, pause and quit
+- Rebindable keys
+- Split screen and picture-in-picture, with HUD for each player's view
+- Video settings: resolution scale, pixelated look, vsync, FPS cap, fullscreen and window size
+- Rain and other particles that run on their own, no code needed
+- Player can push crates, turn to face where it walks and use an over-the-shoulder camera
+- More control over GPU physics from game code: see where bodies are, feed values to your own physics shaders and combine checks
+- Rhythm helpers: turn a tempo into game ticks and know exactly when a key was pressed
+- Game tests can click menu buttons, check screenshots and colors, listen to the sound mix, check save files and restart the game
+- Record a play session and replay it to check nothing changed
+- Same game, same result: easier checks for GPU physics and for whole test runs
+- New guides: Audio, Menus and UI, Cameras and custom GPU physics shaders
+
+### Changed
+
+- Tests show more useful output when something fails
+- Scene edits from the command line can run twice safely and update only some fields
+- Projects get warned when their agent guide is out of date, and `rusting fix` updates it
+
+### Fixed
+
+- Piles of GPU balls now settle and sleep instead of shaking forever, and no longer squeeze through wall corners
+- Spinning GPU bodies come to rest after landing
+- Barrels and other round objects roll properly
+- Player no longer falls through a platform it starts slightly inside
+- HUD text no longer fades in or slides off the screen edge
+- Clearer error messages and fuller docs pages
+- The command-line tool no longer crashes when its output is cut short
+- No more extra full engine rebuild between check and run
+
+---
+
+## [2.0.1] - 2026-10-01
+
+### Added
+
+- Sound! Games can now play, loop and stop sounds and change the volume
+- AI agents can now work with the engine directly: run commands, attach to a running game, step it and look inside
+- New Agent panel in the editor that shows what an agent changed in your scene, and you can still undo it
+- Much stronger game tests: check what is on screen, catch broken values every tick, measure performance and get screenshots with labels
+- New helper commands: compare two scenes, see a scene as a map, jump the game to any moment and inspect it, create a test or system in one command
+- Built-in offline docs and clear explanations for every error, with hints on how to fix common code mistakes
+
+---
+
+## [2.0.0] - 2026-09-31
+
+### Added
+
+- Water for seas, lakes and rivers with waves and currents, objects float in it
+- Small splashing fluids drawn as one smooth surface
+- Glass that bends and blurs what is behind it
+- Reflections on smooth surfaces, sky images for lighting and reflection probes
+- Fog, bloom (glow) and ambient occlusion (soft shadows in corners)
+- Editor got a big visual refresh: new Add Component picker with descriptions, new Project Settings page, nicer Hierarchy, Assets and Console
+- Tile Painter for drawing levels on a grid, with rectangle, line and fill tools
+- Blender-like camera views on Numpad, orthographic view and snap settings
+- Every shortcut can have a second key
+- Physics joints (hinges, sliders, springs and more), joints that can break and robot-like linked bodies
+- Scenes inside scenes (like prefabs), scene variants and overrides
+- Reload Code while the game is running, without restarting the scene
+- Optional scripting with WebAssembly
+- New project templates: first-person, third-person and physics sandbox
+- Many new sample games: platformer, brick breaker, snake, mini golf, stealth, shooter and more
+- A lot of new simple functions for game code (input, raycasts, counters, colors, random, level loading and more)
+- Players ride moving platforms, and the third-person camera no longer goes through walls
+- Materials have names and textures can repeat on long floors
+
+### Changed
+
+- Rendering is much faster: fewer draw calls and higher FPS on Wayland
+- Transparent materials now work as clear glass
+- When the game can't keep up, it slows down instead of freezing
+
+### Fixed
+
+- A lot of physics fixes: fast objects, players on ledges, sleeping bodies, exact replays
+- Textures no longer shimmer in the distance
+- Textures on cube sides were upside down. If you flipped your images to fix it, flip them back
+- Hidden objects and lights no longer show or light the scene
+- HUD text no longer jumps to a new line when it gets longer
+- Game no longer crashes when closing on Wayland
+
+---
 
 ## [1.4.0] - 2026-09-27
 
 ### Added
 
-- Added the `rusting` command-line tool. It works without a window: `doctor` checks the setup, `new` creates a project, and `check`, `run`, `test` and `export` build, run, test and export a game.
-- `rusting` can inspect projects and scenes, find objects by ID, name, class or component, and validate and cook scenes.
-- Added `rusting scene patch` for atomic scene edits with dry-run diffs and revision checks. When the scene is open in the editor, the patch goes through undo and conflicts are reported instead of overwriting work.
-- Added `rusting capture`, which renders a chosen camera at a chosen tick to PNG and tells which scene object is under each picked pixel.
-- Added `rusting schema`, a generated catalog of every component, resource, asset type and command, with defaults, units, valid ranges and examples.
-- Added input-driven test scenarios: named actions at fixed ticks, checks on game state and events, optional captures, fixed seeds, and a short trace from the first failing tick.
-- Added reflection. Components, resources and assets describe their fields with the `reflect!` macro, with units, ranges, colors and docs as hints. Scene saving, the Inspector, the schema and field paths all use these descriptions.
-- Reflection supports enums, nested structs, lists, optional values, string-keyed maps, entity references and typed asset handles.
-- Entity references in components now save as object IDs and are reconnected on load. A reference to a deleted object loads as empty instead of failing. Asset handles save as asset paths.
-- Renamed or removed component fields can be migrated with `migrate_scene_component`. Scenes with unknown fields, unknown enum variants or a newer version now fail with an error that names the component, the field and both versions.
-- Added `DeterminismMode` (Off, Local and CrossPlatform) per project, with a startup check that every solver and custom shader supports the chosen mode.
-- Added a shared simulation math module used by both CPU physics and GPU physics shaders, with defined float-to-integer conversion and no fast-math.
-- Added a seeded random number generator with separate streams for each engine system.
-- Added a world-state hash for every tick, including GPU physics bodies.
-- Added headless simulation without a window or renderer, and a determinism runner that compares two runs and reports the first different tick and body.
-- Added replays: recorded inputs with a seed and format version, replay verification against the recorded hashes, and fast seeking from saved snapshots.
-- Added a determinism CI workflow that runs on changes to physics, math and shader code.
-- Added a render benchmark with a fixed scene and camera path. It records frame times, GPU passes, draw calls, memory, uploads, physics and readback, and fails when a stored baseline gets worse.
-- Added benchmark baselines for the RTX 3060 and llvmpipe, and documented the tested drivers and settings.
-- Added a Profiler panel with CPU and GPU history graphs, CPU spans, GPU pass timings, counters and memory use.
-- Added Render Settings and Physics Diagnostics panels.
-- Added orbit, pan, dolly and Frame Selection (F) controls to the Scene View.
-- Gizmos now have local and global modes and snapping for move, rotate and scale.
-- Mesh Renderer can now pick meshes and materials from the loaded assets.
-- Added a Restart button for the running game.
-- Added an embedded preview that plays the scene inside the editor without a build, with Pause, Resume and Step. Objects created during preview are marked `[Runtime]`.
-- Added image and glTF import with stable IDs, import settings, dependency reports, reimport, and source and license records.
-- Added art-direction presets for lighting, camera, text and color.
-- Added a first-person player controller with a camera.
-- Added a game-feel kit: tweens with easing, sounds and particle bursts triggered by events, counters, pickups and a runtime HUD with text and buttons.
-- Added in-game UI for games, separate from the editor UI.
-- Added a quick 2D path: sprites, tile maps, an orthographic camera and a 2D starter scene.
-- Added a starter game template with a scripted acceptance test.
-- Added the vertical slice sample: an imported courtyard with PBR materials, a player, physics, lights, shadows, transparency and live asset reload.
-- Added `RUSTING_VULKAN_DEVICE` to choose a GPU by index or name. A wrong choice now fails and lists every available device.
-- Added feature flags for the editor, validation layers, experimental GPU physics and optional importers.
-- Added a getting-started guide, a concepts guide, a determinism guide and four tutorials.
+- New `rusting` command-line tool: create, build, run, test and export games without opening the editor
+- Edit scenes, take screenshots and write game tests from the command line
+- Same game, same result every time: replays, fixed random seeds and checks that physics runs the same
+- Play the scene right inside the editor with Pause and Step, no build needed
+- Profiler panel with CPU and GPU graphs, plus Render Settings and Physics panels
+- Better Scene View camera (orbit, pan, zoom, focus with F) and gizmo snapping
+- Image and glTF import with reimport and import settings
+- First-person player controller
+- Game-feel kit: smooth animations, sounds and particles on events, pickups, score counters and in-game HUD with buttons
+- Simple 2D: sprites, tile maps and a 2D starter scene
+- Starter game template and a full sample level
+- Choose which GPU to use
+- Getting-started guide, concepts guide and four tutorials
 
 ### Changed
 
-- The Inspector now draws typed widgets for every registered component from its reflected description, including drop-downs for object and asset references. The raw JSON editor was removed.
-- Scene component fields in `rusting schema` now come from the reflected types, so the schema cannot drift from the code. The schema catalog version is now 2.
-- Registering a scene component now needs a `reflect!` description.
-- More engine types moved into the `rusting-core` crate, which has no Vulkan dependency.
-- The window is now created when the app resumes, which removes the last deprecated winit call.
-- GPU physics buffers now grow with the body count and report overflow instead of dropping bodies.
-- Selected objects now stay outlined when they are behind other geometry.
-- Removed the old legacy renderer, pipeline and scene modules.
-- Rewrote the editor guide. It now covers Scene View navigation, the transform gizmo, the Inspector, asset actions, Preview, the Profiler and diagnostics panels, and keyboard shortcuts. The README lists the current features and project layout.
+- Inspector now shows proper fields, drop-downs and pickers for every component instead of raw JSON
+- Selected objects stay outlined even behind other objects
+- GPU physics no longer drops objects when there are too many
+- Old renderer code removed and editor guide rewritten
 
 ### Fixed
 
-- Fixed fixed-update steps in one frame all seeing the same tick number.
-- Fixed CPU-to-GPU commands being applied at the wrong step when a frame ran several physics ticks.
-- Fixed physics ticks being dropped when a frame needed more steps than the limit. They now run in the next frame.
-- Fixed burst emitters without a scene ID all producing the same burst.
-- Scenes with misspelled or removed component fields no longer drop that data silently.
+- Physics no longer skips or mixes up steps when the game lags
+- Particle bursts no longer all look the same
+- Scenes with renamed or old fields no longer lose data silently
 
 ---
 
@@ -253,79 +689,38 @@ source: "https://github.com/RustingStudio/RustingEngine/blob/main/CHANGELOG.md"
 
 ### Added
 
-- Added a real Console panel with message filtering, log levels, repeated message counts and Clear button.
-- Assets panel now shows image previews.
-- Images can now be dragged directly onto objects and material texture slots.
-- Inspector can now have custom sections for different component types instead of showing everything as raw data.
-- Added editor text size setting. UI scale and text size are saved automatically.
-- Added fully customizable keyboard shortcuts. Almost every editor action can now be rebound.
-- Added Undo, Redo, Save, Delete and Rename shortcuts across the editor.
-- Added automatic CPU/GPU physics mode. The engine can decide which one is better depending on the object and current scene.
-- Added physics benchmark scenes for testing falling objects, stacks, debris and mixed scenes with different object counts.
-- Added much more detailed renderer and physics performance statistics to the editor.
-- GPU physics now has safer memory limits. If there are too many objects, the engine uses a slower fallback instead of breaking collisions.
-- GPU objects can now properly collide with each other.
-- GPU physics stacks are much more stable.
-- Added GPU physics support for raycasts and interaction with CPU physics objects.
-- Added Convex Mesh and Triangle Mesh colliders.
-- Static level geometry can now use its real mesh for accurate collisions.
-- CPU physics objects can now properly rotate from collisions and friction.
-- Spheres can roll naturally.
-- Box collisions are much more stable, especially for stacking.
-- Added multiple GPU physics sync modes, so games can choose how much physics data should be copied back from the GPU.
-- GPU objects can now receive commands like teleport, force, impulse and velocity changes.
-- GPU physics state can now be manually read, saved, restored or reset.
-- Added detection for lost GPU physics events when event memory becomes full.
-- Custom GPU physics conditions can now be written with GLSL shaders.
-- Added versioning for the GPU physics shader API to make custom shaders safer between engine updates.
-- Added one-frame state snapshots for groups of GPU physics objects.
-- Added shape casts for boxes, spheres and capsules.
-- Added basic character movement with collision sliding and floor detection.
-- CPU physics now uses a much faster collision search for large scenes.
-- Custom GPU physics solvers now work during normal gameplay.
-- Custom physics shaders can completely control how selected GPU objects move.
-- GPU objects can now collide with CPU objects and static level geometry.
-- GPU collisions support friction, bounce and collision layers.
-- Added full CPU rigid body simulation for boxes, spheres and capsules.
-- CPU objects can now fall, bounce, rest, sleep and wake up.
-- Added proper raycast and overlap queries for CPU physics.
-- Fast CPU objects now use collision protection to reduce tunneling through thin walls.
-- Added Windows export from Linux and macOS.
-- Added better Vulkan debugging information for graphics debugging tools.
-- Added renderer statistics for draw calls, triangles, visible objects, uploads and GPU memory.
-- Added CPU frame timing statistics for physics, rendering preparation and editor UI.
-- Added GPU timing statistics for individual rendering stages.
-- Added MSAA anti-aliasing to improve edge quality.
-- Added anisotropic texture filtering for sharper textures viewed at an angle.
-- Improved glTF scene spawning so imported objects receive proper scene IDs.
+- Real Console panel with filters and Clear button
+- Image previews in Assets, and images can be dragged onto objects
+- Editor text size setting, saved automatically
+- Fully customizable keyboard shortcuts for almost every editor action
+- Engine can pick CPU or GPU physics for each object by itself
+- Much better physics: real rotation, rolling spheres, stable box stacks, friction and bounce
+- GPU objects now collide with each other, with CPU objects and with the level
+- Accurate mesh colliders for level geometry
+- Basic character movement that slides along walls and detects floor
+- Raycasts and shape casts for checking what is in the way
+- Custom GPU physics rules with your own shaders
+- Fast objects no longer fly through thin walls
+- Windows export from Linux and macOS
+- MSAA anti-aliasing and sharper textures at an angle
+- Detailed performance stats in the editor
 
 ### Changed
 
-- Dragging multiple selected objects in the Hierarchy now moves the entire selection together.
-- The Scene View is now rendered as a normal editor panel, so menus and popups display correctly over it.
-- Keyboard shortcut handling has been improved across the whole editor.
-- The old GPU physics test solver is now called Grid Collision.
-- Physics modes were renamed to simpler names: CPU and GPU.
-- glTF import now adds the complete model hierarchy to the scene, including meshes, materials, cameras and lights.
-- Imported glTF models now behave much more like normal scene objects.
-- Assets panel has been redesigned into a file tree similar to Godot's FileSystem panel.
-- Models can be double-clicked or dragged into the Scene View.
-- Images can be dragged directly onto selected objects.
-- Reusing an image no longer creates unnecessary duplicate materials.
+- Assets panel is now a file tree like in Godot, models can be double-clicked or dragged into the scene
+- glTF import brings the whole model with meshes, materials, cameras and lights
+- Dragging many selected objects in Hierarchy moves them all together
+- Menus and popups now show correctly over the Scene View
+- Physics modes renamed to simply CPU and GPU
 
 ### Fixed
 
-- Fixed editor actions breaking when using the built-in white/error material.
-- Fixed shadow acne that caused stripes and triangles on lit surfaces.
-- Camera movement no longer accidentally clicks or types into editor UI.
-- Fixed GPU physics stacks slowly sinking through each other.
-- Improved GPU collision consistency and stability.
-- Fixed GPU physics events disappearing when several physics updates happened during one frame.
-- Fixed major editor slowdown when selecting objects with very large meshes.
-- Fixed incorrect lighting on glTF models that do not include normal data.
-- Fixed GPU grid collisions producing different results between runs.
-- GPU physics events now arrive in a consistent order.
-- Improved performance of GPU physics event rules.
+- Stripes and triangles on lit surfaces (shadow acne)
+- Camera movement no longer clicks or types into editor UI
+- GPU stacks no longer slowly sink into each other
+- Big editor slowdown when selecting huge meshes
+- Wrong lighting on some glTF models
+- GPU physics now gives the same result every run
 
 ---
 
@@ -474,7 +869,7 @@ source: "https://github.com/RustingStudio/RustingEngine/blob/main/CHANGELOG.md"
 ### Added
 
 - Interactive axis arrows for every transform, so you can move/scale/rotate object just by holding and moving mouse like in blender and other game engines
-- Also shortcuts for transform, "R" for Move, "S" for scale and "R" for rotate.
+- Also shortcuts for transform, "G" for Move, "S" for scale and "R" for rotate.
 - Axes choice, e.g. When you use Move, Scale or Rotate you can press "X" to use Transformation only for "X" axis, also you can press "Y" to transform only in X and Y axes in same time, no translate will allied to "Z".
 - Added transform cancelation of current transform on "Secondary button"(Mostly right click) and "Escape"
 - Some GUI buttons for Transform modes

@@ -3,7 +3,7 @@ title: "Deterministic simulation"
 project: "engine"
 kind: "docs"
 group: "Guides"
-order: 4
+order: 11
 description: "This page records the rules behind DeterminismMode (Milestone 8). Off promises nothing. Local promises identical results on one machine and build. CrossPlatform promises identical results on every supported device. The rules in this page are what CrossPlatform enforces."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/determinism.md"
 ---
@@ -114,7 +114,11 @@ machine, and it must never feed back into simulation state.
 - Gameplay components that `FixedUpdate` systems update:
   `PlayerController`, `PlatformerController` (including `vertical_speed`,
   `grounded`, `jump_buffer`, `air_time`), `Tween` (including its played
-  time), `Pickup`, `Counter`, and `BurstEmitter` trigger flags.
+  time), `Pickup`, `Counter`, `BurstEmitter` trigger flags, and
+  `ObjectState` (which game code sets and its `transitions` advance)
+  and `Health` and `Dialogue` (its `current` line), which game code
+  sets. `LootTable` is not hashed: no
+  system changes it, and rolls read it with the seeded `random`.
 - Resources: `PhysicsWorld` (warm-start impulses and sleep counters),
   `PhysicsSettings`, `FrameTime::fixed_tick` and `fixed_delta`,
   `RandomSeed`, `DeterminismMode`, `PhysicsIdRegistry`, and
@@ -142,7 +146,7 @@ machine, and it must never feed back into simulation state.
 - Rendering: cameras, lights, `RenderSettings`, quality profile, culling,
   materials, `MeshRenderer`, `Visibility`, the render world, and every
   rendering shader (which may keep `mediump` and fusion).
-- `BurstParticle` entities, `SoundEvent`s, `HudElement`, UI, the
+- `BurstParticle` entities, `SoundEvent`s, `ReverbZone`, `SlideSound`, `HudElement`, UI, the
   profiler, and editor state.
 
 A presentation system may read simulation state but never write it; a
@@ -158,8 +162,9 @@ them is not deterministic until they are delivered at a fixed tick lag
 
 After every fixed step, `App::update` hashes the simulation state above
 and appends `(tick, hash)` to the `StateHashes` resource, which keeps the
-last `STATE_HASH_HISTORY` (1024) ticks. The tick is the number of steps
-completed. `world_state_hash` feeds raw `f32` bits in entity order,
+last `STATE_HASH_HISTORY` (1024) ticks. A scenario report copies them
+after every tick, so `rusting determinism --scenario` compares every tick
+of a run of any length. The tick is the number of steps completed. `world_state_hash` feeds raw `f32` bits in entity order,
 sorts `PhysicsWorld`'s sleep counters and warm-start impulses by entity,
 and writes small gameplay components through `Debug`, whose shortest
 round-trip float formatting tells every value apart. It stays on in
@@ -183,13 +188,26 @@ spread a change to several bodies within one tick, so the named entity is
 not always the one where the change started.
 
 `rusting determinism <project> --ticks N` compares separate processes. It
-builds the game in debug and release, runs each headless, and runs the
-release build again under `taskset --cpu-list 0`, so bevy's task pool and
-rayon start one thread. It compares every tick against the debug run. At
-the first mismatch it runs both configurations again up to that tick and
-compares their entity hashes, then fails with `DETERMINISM_DIVERGED`, the
-tick, and the entity. On the starter template the three configurations
-give the same 120 hashes; a debug-only `1e-4` nudge to the player's
+builds the game in debug and release, runs the debug build twice and the
+release build once headless, and runs the release build again under
+`taskset --cpu-list 0`, so bevy's task pool and rayon start one thread.
+The second debug run reuses the build but adds one debug run of N ticks to
+the command's time. It compares every tick against the first debug run,
+the second debug run first. At the first mismatch it runs both
+configurations again up to that tick (into `<configuration>-rerun-<tick>.json`)
+and compares their entity hashes, then fails with `DETERMINISM_DIVERGED`,
+the tick, and the entity, or says that the rerun found no differing
+entity. When the two debug runs already differ, or a rerun gives other
+tick hashes than its first run, `data.divergence.kind` is `run_to_run`:
+the game reads something that changes between runs into its world state,
+such as results from its own worker threads applied whenever they arrive,
+wall-clock time, network timing or unseeded randomness, so a compiler
+difference is not the cause. A debug-versus-release difference that
+repeats is `configuration`. Entities pair by scene ID only when both runs
+have that ID; an object the game spawns at runtime gets a fresh random
+scene ID every run, so it pairs by name and position instead: the k-th
+such `coin` with the k-th `coin`. On the starter template every
+configuration gives the same 120 hashes; a debug-only `1e-4` nudge to the player's
 position on tick 30 is reported as tick 31, `Player`. GPU vendors and
 drivers are not covered: GPU bodies do not simulate headless, and this
 machine has one GPU.
@@ -330,12 +348,22 @@ The engine meets `Local` today and does not meet `CrossPlatform` yet:
   body order whatever sweep axis it picks, and solves contacts in that
   order. `PhysicsWorld::gpu_colliders` keeps that order; GPU bodies upload
   sorted by `PhysicsId` slot.
+- Because bodies are solved in `Entity` order, adding, removing or
+  reordering entities in the scene, even ones without bodies, can change
+  which body a contact resolves first. The same scene still replays
+  exactly, but a chaotic result such as where a toppled stack of barrels
+  ends up can move after an unrelated scene edit. Scenario checks on such
+  results should test something robust (distance travelled, fell over,
+  left an area) rather than a final position to a few centimetres.
 - GPU contacts: the grid pass fills hash cells and the fallback list with
   atomics, so which body lands where changes between runs. That never
   changes the result. A body that is not oversized reaches no further than
   one cell, so every touching pair is found whether a body sits in a cell
-  or in the fallback list. Each body sums its pushes in integers, and
-  integer addition gives the same result in any order.
+  or in the fallback list. Each body keeps the largest push and velocity
+  change each way per axis, and max and min give the same result in any
+  order. A body too big for one cell gets its own workgroup: its threads
+  split the bodies to test, then merge their max and min in shared memory,
+  which matches one thread testing every body in turn bit for bit.
   `gpu_bodies_collide_with_each_other_through_grid_and_fallback` checks that two
   runs, and a run with no hash memory at all, match bit for bit.
 - Each fixed step sees its own `FrameTime::fixed_tick` (the ticks
@@ -353,8 +381,10 @@ The engine meets `Local` today and does not meet `CrossPlatform` yet:
   frame that carries two ticks over.
 - Randomness: simulation code draws every random value with
   `RandomSeed::value(tick, RandomSeed::stream(subsystem, key))` (or
-  `unit`). The seed comes from the scene or scenario, the tick is the
-  fixed tick being simulated, and the subsystem name keeps streams apart.
+  `unit`). The seed is the scenario's `seed`, else `rusting run --seed N`
+  (or `rusting test --seed N`), else `"seed": N` in `project.json`, else
+  0; a replay restores the recorded one. The tick is the fixed tick
+  being simulated, and the subsystem name keeps streams apart.
   Bursts use `"bursts"` keyed by the emitter's `SceneId`, or by its entity
   when it has none. Simulation code never reads a global or thread-local
   generator, `Uuid::new_v4`, or `HashMap` iteration order; GPU physics

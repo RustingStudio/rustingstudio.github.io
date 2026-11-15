@@ -3,7 +3,7 @@ title: "WebAssembly scripts"
 project: "engine"
 kind: "docs"
 group: "Guides"
-order: 5
+order: 25
 description: "Native Rust plugins are the main way to write gameplay. The optional rusting-script crate adds small sandboxed scripts for modding and designer-level logic. A script is a WebAssembly module attached to one object. It runs in the Wasmi interpreter with no access to files, the network, the clock, or random numbers. It can read and write the same reflected component fields that scene files, the Inspector, and animation tracks use."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/scripting.md"
 ---

@@ -3,7 +3,7 @@ title: "M4 results: chunked GPU prefill"
 project: "strata"
 kind: "docs"
 group: "Reference"
-order: 3
+order: 10
 description: "Model: Qwen3.6-35B-A3B-UD-Q2_K_XL, RTX 3060 12 GB, Ryzen 5 7600X. Prompt: 3970 tokens (spec + plans text), strata generate --gpu --ctx 8192 -n 128, --chunk as listed (1024 until 8d0c3c4, then 4096). Three runs each, GPU otherwise idle."
 source: "https://github.com/RustingStudio/RustingStrata/blob/main/docs/m4-results.md"
 ---

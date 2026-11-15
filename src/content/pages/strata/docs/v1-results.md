@@ -3,7 +3,7 @@ title: "M6 results: v1 gate"
 project: "strata"
 kind: "docs"
 group: "Reference"
-order: 4
+order: 11
 description: "Model: Qwen3.6-35B-A3B-UD-Q2_K_XL, RTX 3060 12 GB, Ryzen 5 7600X. 01:00-01:14, same session for both engines, everything under the GPU lock (730-790 MiB VRAM used by others before each step). Another loop's rustc builds pushed host load to 21-28 during the first Strata runs; the 512/4K rows were re-run at load 2.6-4.1 and those numbers are the ones below. The 32K rows ran at load 21-24 and are lower bounds."
 source: "https://github.com/RustingStudio/RustingStrata/blob/main/docs/m6-results.md"
 ---

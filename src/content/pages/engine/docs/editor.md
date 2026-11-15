@@ -3,7 +3,7 @@ title: "Editor guide"
 project: "engine"
 kind: "docs"
 group: "Guides"
-order: 3
+order: 4
 description: "The editor window is split into areas, as in Blender. Each area shows one editor type, such as Scene View, Hierarchy, or Inspector, and you can split, resize, and change areas freely. Every change to the scene can be undone."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/editor_gui.md"
 ---
@@ -109,7 +109,7 @@ or removes them from it.
 
 The transform gizmo works like Blender's:
 
-1. Press `R` to move, `R` to rotate, or `S` to scale the selection. You can
+1. Press `G` to move, `R` to rotate, or `S` to scale the selection. You can
    also use the toolbar buttons, or drag a gizmo handle.
 2. Press `X`, `Y`, or `Z` to lock the change to one axis.
 3. Click to confirm. Right-click or `Escape` cancels and restores the old
@@ -282,11 +282,13 @@ editor. Results appear in `Cargo Output`.
   by a frame or more.
 - **Render Settings** holds the scene's render settings, VSync, the FPS
   limit, the GPU in use, and rendering diagnostics. Its Quality section
-  sets anti-aliasing (Auto, Off, MSAA 2x or MSAA 4x) and the shadow map
-  size (Auto, Low, Medium or High); Auto follows the quality profile. Like
-  VSync, these two are not saved with the scene. MSAA 2x falls back to off
+  sets anti-aliasing (Auto, Off, MSAA 2x, MSAA 4x, FXAA or TAA) and the
+  shadow map size (Auto, Low, Medium or High); Auto follows the quality
+  profile. Like VSync, these two are not saved with the scene. MSAA 2x falls back to off
   on a GPU without it, and "MSAA in use" shows the count the renderer
-  picked.
+  picked. When a surface, sky, fog, particle, post or condition shader fails
+  to build, a "Shader errors" section lists the compiler messages; it
+  clears on the frame after the source is fixed.
 - **Physics Diagnostics** shows which physics backends are available, how
   many bodies run on the GPU and the CPU, the GPU work and readback each
   frame costs, and what falls back when a capacity limit is reached.
@@ -304,7 +306,7 @@ every project.
 | Save scene | `Ctrl+S` |
 | Rename selection | `F2` |
 | Delete selection | `Delete` |
-| Move, rotate, scale | `R`, `R`, `S` |
+| Move, rotate, scale | `G`, `R`, `S` |
 | Lock to one axis | `X`, `Y`, `Z` |
 | Frame selection | `F` |
 | Fly mode on and off | `Numpad 0` |

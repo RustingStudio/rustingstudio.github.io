@@ -3,7 +3,7 @@ title: "Core concepts"
 project: "engine"
 kind: "docs"
 group: "Start"
-order: 2
+order: 3
 description: "A short tour of the ideas the tutorials rely on."
 source: "https://github.com/RustingStudio/RustingEngine/blob/main/docs/concepts.md"
 ---
@@ -19,7 +19,8 @@ same files, so you can switch between them at any time.
 ## Scenes
 
 A scene (`scenes/main.rscene`) is JSON: a list of entities, each with a
-persistent ID (a UUID), a name, an optional parent, and components. Built-in
+persistent ID (a UUID), a name, an optional parent, and components. A
+child's transform is relative to its parent, scale included. Built-in
 components have their own fields (`transform`, `mesh_renderer`, `camera`,
 `rigid_body`, `collider`, lights, ...). Everything else, built-in gameplay
 components such as `rusting.pickup` and your own, lives under `components`
@@ -30,6 +31,10 @@ by registered name.
   tools address them by ID.
 - `rusting scene query` prints entities, `rusting scene patch` changes them
   as one atomic batch, and the editor edits them with undo.
+- `rusting scene split` turns a large scene into folder form, a `.rscene`
+  directory with one file per entity, so edits to different objects do not
+  conflict in git; `rusting scene join` turns it back. Every tool reads and
+  writes both forms.
 - `rusting schema` lists every component and field, with defaults, units,
   and valid ranges.
 - Registered components are described with `reflect!`. The description
@@ -59,6 +64,9 @@ Each placement gets a root named `coin #1`, `coin #2`, and so on, with IDs
 that are the same when the game replays the same placements in the same
 order. Paths are relative to the project folder, where games run. Keep
 runtime prefabs under `assets/` so that export includes them.
+From a `GameScene`, `scene.spawn_prefab("prefabs/coin.rscene", "Coin 3",
+transform)` does the same in one call, with the path relative to `assets/`
+and the root named `Coin 3`.
 
 **Cooking** turns the JSON scene into a compact binary
 (`build/main.rscene.bin`) that the game loads. Play, `rusting run`, `test`,
@@ -73,6 +81,12 @@ A game's `main.rs` picks one of two entry points:
   `GameScene`. Find objects by name, move and rotate them, spawn cubes and
   spheres, turn on GPU physics for a class, and read GPU events. Good for
   small games and procedural setup. See [Tutorial 1](/engine/tutorials/01-hello-cube/).
+- **`rusting_game!(update, tick: tick)`**: the same, plus `tick` called
+  once per fixed tick before the frame's `update`. Step game state (timers,
+  AI, rules) in `tick` and draw the HUD in `update`. Inside `tick`,
+  `scene.pressed(action)` is true on the first tick after the press, even
+  at 144 Hz when most frames run no tick; later ticks of the same frame see
+  no press.
 - **A `Plugin` passed to `run_project`**: normal ECS systems (the engine uses
   `bevy_ecs`) with queries, resources, input actions, and your own
   components saved in scenes. See [Tutorial 3](/engine/tutorials/03-gameplay-plugin/).
@@ -166,7 +180,36 @@ fn open_door(tree: SceneTree, mut doors: Query<&mut Transform>) {
 | `name(entity)` | The object's name. |
 | `in_class(class)`, `is_in_class(entity, class)` | Class members from `ClassIndex`. |
 
+## Build times
+
+`rusting check`, `run`, `test` and `export` build game code with Cargo.
+The budget is 3 seconds from saving a game file to its diagnostic once
+the engine is built. Measured on forever-bear (3,700 lines of game code,
+Ryzen 5 7600X, 2026-10-07): a type error is reported in 0.9 s and the
+fixed build is green in 2.1 s.
+
+The first build of a project compiles the engine and takes about 2
+minutes. `rusting check`, `run`, `test`, `export` and the editor keep
+Cargo's intermediate files in one shared build folder per engine version,
+`~/.cache/rusting/build-<version>` (under `$XDG_CACHE_HOME` when it is
+set, `%LOCALAPPDATA%` on Windows; with none of these, each project builds
+in its own `target/`). Every project after the first reuses
+that engine build: a second new project's first `rusting run` took 1.9 s
+instead of 118-132 s, and its `target/` holds 46 MB instead of 1.9 GB.
+The game's binary still goes to the project's own `target/`, so games
+with the same package name do not overwrite each other. Games that pick
+different engine features still compile their own copy of the engine
+once. Delete old `build-<version>` folders after upgrading the engine.
+
+To use your own folder instead, set `CARGO_TARGET_DIR` (one shared
+target directory for everything) or `CARGO_BUILD_BUILD_DIR` (intermediate
+files only); the engine then leaves the choice to Cargo. Plain `cargo
+build` in a game folder does not use the shared build folder.
+
 ## Data assets
+
+Images, models and sounds are imported files, not data assets; see
+[Assets](/engine/docs/assets/).
 
 A data asset is a file of typed values that several objects share, like a
 Godot `Resource` saved as `.tres`. Enemy stats, loot tables and dialogue
@@ -253,6 +296,53 @@ state is lost.
   `hot reload failed:` with the reason, and the editor's Console shows it.
 - Unique copies have no file, so reloads never change them.
 
+## Waypoint graphs
+
+`WaypointGraph` moves a monster between hand-placed points, such as the
+aisles and doors a mascot patrols. It is plain data: positions and two-way
+edges. A node's ID is its index.
+
+```rust
+use rusting_engine::runtime::WaypointGraph;
+
+let mut graph = WaypointGraph::default();
+let booth = graph.add_node([0.0, 0.0, 0.0]);
+let hall = graph.add_node([0.0, 0.0, 8.0]);
+let aisle = graph.add_node([6.0, 0.0, 8.0]);
+graph.connect(booth, hall);
+graph.connect(hall, aisle);
+
+let start = graph.nearest(monster_position).unwrap();
+let route = graph.path(start, booth); // Some(vec![aisle, hall, booth])
+```
+
+- `path` returns the shortest route by straight-line edge length, both ends
+  included, or `None` when nothing joins them. `length` sums a route.
+- `disconnect` removes an edge, for a door that closes, and `connect` adds it
+  back.
+- Ties resolve the same way every run: `nearest` picks the lowest ID among
+  equal distances, and `path` prefers lower IDs among equal-cost routes. A
+  path chosen in a fixed tick stays in step with replays.
+- The graph serializes with serde, so it can be a field of a data asset or a
+  component.
+- There is no navmesh, no automatic graph building and no obstacle
+  avoidance between nodes. Place nodes where a straight walk between
+  neighbors is clear.
+
+## Steam achievements
+
+`rusting_engine::steam` holds the calls a game makes to Steam:
+`unlock_achievement("night_5")`, `set_stat("nights_survived", 5)` and
+`is_running()`. Call them from game code now. Today they do nothing and
+return `false`, in every build, so the game runs the same with or without
+Steam installed.
+
+- The optional `steam` cargo feature is reserved for the real Steamworks
+  backend. That backend needs the `steamworks` crate, which waits on the
+  owner's approval, so the feature adds nothing yet.
+- Unlocks are presentation, like audio. Never read their result back into
+  simulation state, or replays stop matching.
+
 ## Frames and fixed ticks
 
 The engine separates **frames** from **fixed ticks**:
@@ -265,7 +355,15 @@ Systems run in stages: `Startup`, `FixedUpdate` (once per tick), `Update`
 (once per frame), `PostUpdate`, and `RenderExtract`. Physics and anything
 that must replay identically runs in `FixedUpdate` and reads
 `FrameTime::fixed_delta`. Visual effects and per-frame input handling run in
-`Update` and read `FrameTime::delta`.
+`Update` and read `FrameTime::delta`. Inside a tick `FrameTime::delta` equals
+`fixed_delta`, so tick code that scales by `delta_seconds()` steps by the
+fixed step.
+
+`scene.pressed` in a plain `update` is true for one frame. A frame can
+run no tick or several, so game code that steps state per tick inside
+`update` misses presses on fast displays; use the `tick:` function of
+`rusting_game!` instead. Scenarios run one tick per frame and do not show
+the problem.
 
 `FrameTime` also holds `elapsed` game time, `fixed_tick` (ticks completed),
 and `frame`. `TimeControl` pauses, steps, and scales time.
@@ -286,10 +384,130 @@ bodies stay on the GPU. The CPU does not download their transforms every
 frame. Instead you attach **rules** (`GpuPhysicsRule`: "position Y below
 -20", "colliding", "timer elapsed") to an object or a whole **class**, and the
 GPU sends back an event only when a rule matches. See
-[Tutorial 4](/engine/tutorials/04-gpu-cube-rain/).
+[Tutorial 4](/engine/tutorials/04-gpu-cube-rain/), and the
+[Physics guide](/engine/docs/physics/) for ownership, readback latency and solver
+choice.
 
 `rigid_body.kind` is `Dynamic` (moved by forces), `Kinematic` (moved by your
 code or a controller), or `Fixed`.
+
+### Gravity volumes
+
+A `rusting.gravity_volume` on a `Fixed` CPU body with a sensor collider
+replaces the scene gravity for dynamic CPU bodies that overlap it, like a
+Godot `Area3D` gravity override. `gravity: [0, 0, 0]` makes a zero-g room and
+a sideways vector a wind tunnel. `toward_center` above 0 pulls toward the
+object's centre at that many m/s², so a sphere sensor becomes a small planet.
+Where volumes overlap, the highest `priority` wins. `gravity_scale` still
+applies. GPU bodies and the player controller keep the scene gravity.
+
+### Substeps: long joint chains and heavy-on-light stacks
+
+The CPU solver runs each fixed step as `PhysicsSettings::substeps` equal
+substeps (default 1; `ProjectRunner::set_physics_substeps(n)` in a game).
+More substeps hold joints and stacks tighter, at about that many times the
+solver cost. Measured on a 20-ball joint chain whose tip is 50 times heavier
+than each link, 300 steps in release:
+
+| Substeps | Largest link stretch | Stretch at rest | Time |
+| --- | --- | --- | --- |
+| 1 | 6.6 m | 0.41 m | 29 ms |
+| 4 | 0.024 m | 0.001 m | 74 ms |
+| 8 | 0.009 m | 0.0004 m | 124 ms |
+
+A 100 kg box on a 1 kg box sinks 6 cm into it with 1 substep and under 1 cm
+with 4. For a chain or ragdoll that must never stretch, put
+`rusting.articulation` on its root instead: the joints then hold exactly at
+any mass ratio, at a cost that grows with the cube of the link count.
+Substeps are a scene setting, not part of the render quality profile, so
+the simulation is the same on every machine.
+
+### Many GPU bodies: keep the contact grid uncrowded
+
+GPU contacts use a grid. Each cell is as wide as the largest GPU body and
+holds 8 bodies. A body that finds its cell full goes to a fallback list, and
+every GPU body tests that whole list in each contact round. So more than 8
+bodies per cell costs every body, not only the crowded ones. Do not clamp
+many bodies to one plane, such as a hard ceiling or floor height in a
+shader; give each body a slightly different height instead. One very large
+GPU body makes every cell large, so keep GPU bodies of a similar size.
+
+The latest physics frame's counts are in the `RenderCapacityDiagnostics`
+resource: `physics_grid_overflow` (bodies that found their cell full),
+`physics_oversized_bodies` and `physics_fallback_tests` (pair tests made
+through the fallback list). `rusting test --json` reports the same fields
+under `perf.render`. Game code reads them like this:
+
+```rust
+let overflow = scene
+    .world()
+    .get_resource::<RenderCapacityDiagnostics>()
+    .map_or(0, |counts| counts.physics_grid_overflow);
+```
+
+### Many bodies: what costs time
+
+With thousands of bodies, a few per-body costs decide the frame rate:
+
+- Triangles. A `SphereSpawn` sphere has `4 * subdivisions * subdivisions`
+  triangles: 36 at 3, 144 at 6, 1,024 at the default 16. Forty thousand
+  balls at 6 are 5.8 million triangles a frame; at 3 they are 1.4 million
+  and look the same when small or pixelated. `perf.render.triangles` in
+  `rusting test --json` adds up every pass that draws a mesh, so it can be
+  a multiple of the mesh count. For models, use level of detail
+  (`rusting docs show guide/look-and-feel`).
+- Draw calls. `perf.render.draws` counts draw commands, one per mesh in
+  view for the scene and for each shadow cascade; `perf.render.draw_calls`
+  counts the calls the CPU records, each a few microseconds. Meshes fill
+  shared GPU pages of up to 16 MiB in the order they are made or edited,
+  whatever the frame. On a GPU with multi-draw indirect (desktop GPUs and
+  most others) one call draws every mesh of a page with the same material
+  textures, so `draw_calls` can be a tenth of `draws`. Shadow cascades
+  always merge this way. The scene pass merges only when culling runs
+  (any `culling` mode but `Disabled`, and `Auto` only from 128 objects)
+  and never for blended materials; otherwise each of its draws is a call.
+  Removing or editing a mesh leaves a gap in its page; a page under a
+  quarter full moves its meshes to the current page and frees. An object
+  that does not move or change is not packed again, but a frame where any
+  object moves still copies every object's instance data to the GPU. A
+  world kept as one `spawn_mesh` object per chunk costs well under a
+  microsecond of CPU per object a frame.
+- Overdraw. Opaque batches of one material group draw front to back by
+  the distance from the camera to their nearest object, so the depth test
+  skips most hidden pixels. The buckets grow with distance (two per
+  doubling), and inside a bucket meshes keep the order they were made in,
+  which keeps most of a page's draws in one call. The order is sorted again
+  when objects are added or removed, or when the camera has moved 8 m;
+  turning needs no new sort. Blended objects still draw last, back to front.
+- `scene.state_hash(class)` reads every object in the class: about 5 ms
+  for 40,000 bodies. Call it on checkpoint ticks (every 30 ticks, or where
+  a scenario checks it), not in every `update`.
+- The GPU contact grid: keep cells under 8 bodies, as above.
+- `scene.raycast` walks a box tree over the CPU colliders, and another
+  over each mesh or heightfield collider's triangles, so a ray tests only
+  what lies along it: about 0.35 microseconds per ray against 200 colliders
+  and 0.3 against a 256 x 256 heightfield (131,072 triangles) in a release
+  build (Ryzen 5 7600X). The collider tree is rebuilt by the first ray after
+  each physics tick, so batch rays within a tick. `cargo test --release
+  --lib raycast_cost_per_ray -- --ignored --nocapture` in the engine
+  measures it.
+- Compare runs with `rusting test --json`: `perf.tick_ms_p95` is the CPU
+  side and `perf.render.gpu_ms_p95` the GPU side. `perf.render.cameras`
+  splits the GPU time, draws and triangles per camera and camera screen.
+  `perf.render.passes_ms` splits it per pass (`Shadow.cascade0`,
+  `Scene.terrain`, `Scene.foliage`..).
+  `perf.render` is filled when the scenario renders: a `max_draws` or
+  `max_triangles` budget, `"gpu": true`, or a capture or `expect_pixels`
+  step. Without one it is null.
+- Entity count. `perf.entities_max` in `rusting test --json` is the most
+  live entities after any tick: scene objects, spawned copies and counters,
+  not engine resources. A `"budgets": {"max_entities": 3000}` limit fails
+  the run when a scenario goes over it. Through `scene.world()`,
+  `entities().len()` counts allocated slots, not live entities.
+- Memory. `perf.rss_mb` is the game process's resident memory in MiB at
+  the end of the scenario and `perf.rss_mb_peak` its peak since start
+  (Linux only, null elsewhere). Run a long scenario twice at different
+  lengths: a game that does not leak ends near the same `rss_mb`.
 
 A `rusting.joint` component joins a CPU body to another CPU body, its
 `target`, or to the world when `target` is null. `anchor` and `frame` place
@@ -331,20 +549,116 @@ Game code reads **actions**, not keys. The `ActionMap` resource binds action
 names to keys and mouse buttons; `RuntimeInput` holds this frame's raw
 state. The engine binds `player.forward`, `player.back`, `player.left`,
 `player.right` (WASD and arrows), `player.jump` (Space), and
-`player.sprint` (Shift). Scenario tests press and release actions by name,
-so a game that uses actions is testable without a keyboard.
+`player.sprint` (Shift), and `player.crouch` (C or left Ctrl; the
+controller crouches only with `crouch_height` above 0). Scenario tests press and release actions by name,
+so a game that uses actions is testable without a keyboard. See
+[Input](/engine/docs/input/) for gamepads, rebinding and raw input.
 
 ## Tests you can run without a screen
 
-- `rusting run <project> --ticks N` runs the game headless for N ticks.
+- `rusting run <project> --ticks N` runs the game headless for N ticks and
+  saves the end state to `build/final.rscene`; `--out FILE` saves it
+  elsewhere, so two headless clients of one server keep separate files, and
+  `--realtime` runs one tick per fixed step of real time, as a played game
+  does, instead of as fast as the CPU allows.
 - `rusting test <project> <scenario.json>` presses actions at fixed ticks and
   checks scene values, collision events, and screenshots.
+  `rusting test <project>` runs every scenario in `tests/` and saves the
+  results to `build/test-results.json`, which the editor's Agent area shows
+  in its Results tab: pass or fail, the failure message, and each scenario's
+  tick time (mean, p95, max) with draws and triangles when it rendered.
 - `rusting determinism <project>` checks that debug, release, and one-CPU
   builds produce the same simulation, tick by tick.
+- `rusting bisect <project> <other-copy> --ticks N` runs two copies of a
+  game, such as two git worktrees with different code or scenes, and names
+  the first tick and entity whose state differs. Entities pair by scene ID,
+  so a revision that adds or removes entities still lines up.
 
-GPU bodies do not move in headless runs, because no renderer runs their
-compute shaders. A headless run warns when the loaded scene has GPU bodies;
-bodies that game code moves to the GPU later are not counted.
+GPU bodies do not move in `rusting run --ticks`, because no renderer runs
+their compute shaders. A headless run warns when the loaded scene has GPU
+bodies; bodies that game code moves to the GPU later are not counted.
+`rusting test` runs them when the scenario sets `"gpu": true` or has a
+`capture` step, because either opens the headless Vulkan device; software
+Vulkan (lavapipe) works but is slow. Without both, a scenario's GPU bodies
+stay where they spawned.
+
+A scenario fails when no tick finishes for 60 seconds, for example after a
+deadlock in game code. The failure names the last tick that finished. Set
+`RUSTING_TEST_STALL_SECS` to change the limit, or to `0` to turn it off.
+Every 5 seconds without a finished tick, the game prints
+a line such as
+`` [rusting test] scenario `w3`: still on tick 0 after 5 s `` to stderr.
+`rusting test` shows these lines even without `--stderr`, and never on
+stdout, so `--json` output stays clean. A debug build of a heavy game, one
+that generates a large world at startup for example, can take minutes
+where `rusting test --release` takes seconds; use `--release` for such
+games.
+
+To read values without checking them, add a `report` step:
+`{"tick": 200, "report": ["counter:xp", "Player/transform/position"]}`.
+Each name is an entity name followed by a JSON pointer, or `counter:<name>`
+alone for a counter's value. The step never fails; its result's `actual`
+maps each name to its value, or to `null` when the entity or path is
+missing, so one run reads every value a test needs. `log` reads one value
+the same way.
+
+A check with `"within": N` passes on the first tick through `N` that it
+holds; its result in the report gives that tick as `passed_at_tick`, so a
+scenario can measure how long something took, such as an edit's round trip
+under simulated lag.
+
+`rusting test <project> tests` runs every scenario in the folder with one
+build, several at once: `--jobs N` sets how many (by default a quarter of
+the CPUs, from 1 to 4, since each game already uses several threads), and
+`--jobs 1` runs them one at a time. Results are listed in name order either
+way. A scenario with `budgets` runs alone before the others, so other games
+do not slow its ticks, and so does one that uses the GPU (`gpu`, `capture`
+or `expect_pixels`), since several Vulkan games at once can crash the
+driver. While several run at once, `--timeout` (which applies to each
+scenario) and the stall limit are multiplied by their number, the stall
+limit only when `RUSTING_TEST_STALL_SECS` is unset, and `--stderr` lines
+from different scenarios interleave. `build/scenario-report.json` holds the report of the scenario
+that finished last, and is removed when that one wrote none.
+
+A scenario stops at its first failed check. To list every failed check,
+including several at the same tick, set `"keep_going": true` in the
+scenario, pass `--keep-going` to `rusting test`, or set the environment
+variable `RUSTING_KEEP_GOING=1`.
+
+To prove a scenario checks a mechanic, run it with that mechanic's
+component switched off: `rusting test <project> tests/jump.json --without
+rusting.player_controller`. Every scene the game loads leaves the component
+out (a built-in section such as `collider` or `rigid_body`, or a registered
+component name; repeat `--without` for more), and the result inverts: the
+run passes when the scenario fails or the game crashes, and fails with
+`SCENARIO_TOO_WEAK` when the scenario still passes. A `--without` run does
+not update `build/test-results.json`.
+
+To run a scenario against an exported build, pass the exported executable:
+`rusting test <project> tests/smoke.json --exe exports/my_game/my_game`.
+Nothing is cooked or built; the game runs from its own folder, so it reads
+the export's scene and assets, while the scenario, report and test data stay
+in the project. The export must be built for the machine that runs the test.
+
+To find input that breaks a game, give a scenario `invariants` and fuzz it:
+`rusting fuzz <project> tests/invariants.json --seeds 50`. Each seed runs the
+scenario with seeded random presses and releases of the scene's actions (or
+the `--action` names, or the scenario's own `fuzz` actions; name actions that
+game code binds this way), each
+flipping with chance 0.1 per tick. The first seed that fails a step or an
+invariant, or crashes the game, is written to `build/fuzz/seed-N.json` with
+the presses as ordinary steps up to the failing tick, so `rusting test`
+replays it and the file can become a regression test. A scenario can also
+carry the random input itself as `"fuzz": {"seed": 3, "actions": [], "rate":
+0.1}`; its report then lists the presses as `fuzz_steps`.
+
+Every scenario report also carries `coverage`: the scene before tick 0
+compared with the scene at the end. It lists the entities that changed and
+which sections changed in each (`transform`, `components/rusting.counter`),
+the entities added and removed, how many stayed the same, the sections and
+components no entity changed (`sections_untouched`, the mechanics this
+scenario does not exercise), the actions pressed, and the trace events by
+kind. A value that changed and came back by the end counts as unchanged.
 
 ## Determinism
 
