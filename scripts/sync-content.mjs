@@ -117,6 +117,13 @@ const MANIFEST = {
     ],
     tutorials: [],
   },
+  runner: {
+    repo: 'RustingRunner',
+    docs: [
+      ['README.md', 'index', 'Start', 'Overview'],
+    ],
+    tutorials: [],
+  },
   rpu: {
     repo: 'RustingPU',
     docs: [

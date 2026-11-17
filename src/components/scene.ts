@@ -5,7 +5,7 @@
 
 import { startBlackHole } from './blackhole';
 
-export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader' | 'strata' | 'rpu';
+export type SceneKind = 'forge' | 'engine' | 'brain' | 'shader' | 'strata' | 'rpu' | 'runner';
 export interface SceneOptions { still?: boolean; density?: number; focusX?: number; focusY?: number; fill?: number; seed?: number; interactive?: boolean }
 
 type RGB = number[];
@@ -540,7 +540,78 @@ function makeRpu(): Draw {
   };
 }
 
-const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader, strata: makeStrata, rpu: makeRpu };
+/* -- runner: one image in, one mesh out. A framed picture of an object on the left;
+   its points lift off the picture and settle into a turning low-poly solid on the
+   right, then fall back into it. */
+function makeRunner(opt: SceneOptions): Draw {
+  const SEG = Math.max(6, Math.round(10 * (opt.density || 1))), PX = -150, SX = 130, HALF = 100, CH = 26;
+  const RINGS = [[-80, 34], [-52, 58], [-12, 62], [28, 40], [54, 22], [80, 34]];
+  const V: Vec[] = [], E: number[][] = [];
+  RINGS.forEach(([y, rad], i) => {
+    for (let j = 0; j < SEG; j++) {
+      const a = (j + i / 2) / SEG * 6.283, n = i * SEG + j;
+      V.push([Math.cos(a) * rad, y, Math.sin(a) * rad]);
+      E.push([n, i * SEG + (j + 1) % SEG]);
+      if (i) E.push([n, n - SEG], [n, (i - 1) * SEG + (j + 1) % SEG]);
+    }
+  });
+  const OUTLINE: Vec[] = [...RINGS.map(([y, rad]) => [PX + rad, y, 0]), ...RINGS.map(([y, rad]) => [PX - rad, y, 0]).reverse()];
+  const h = HALF, FRAME: Vec[] = [[PX - h + CH, h, 0], [PX + h, h, 0], [PX + h, -h, 0], [PX - h, -h, 0], [PX - h, h - CH, 0]];
+  return (ctx, t, W, H, col, par, opt) => {
+    const narrow = W < 760;
+    const cxp = W * (narrow ? 0.5 : (opt.focusX || 0.68)), cyp = H * (opt.focusY || 0.48);
+    const sc = Math.min(W * (narrow ? 1.2 : 0.8), H * 1.7) / 700, cam = 900, f = 800;
+    const yaw = -0.3 + Math.sin(t * 0.17) * 0.1 + par.x * 0.5, pitch = 0.2 + par.y * 0.2;
+    const P = (v: Vec) => { const q = rot(v, yaw, pitch); const z = q[2] + cam; return [cxp + q[0] * f / z * sc, cyp - q[1] * f / z * sc, z]; };
+    const path = (pts: Vec[]) => { ctx.beginPath(); pts.forEach((v, i) => { const q = P(v); if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); }); ctx.closePath(); };
+    // a 9 s loop: picture, lift, turn, fall back
+    const p = t % 9, g = p < 1 ? 0 : p < 3.5 ? (p - 1) / 2.5 : p < 7.5 ? 1 : 1 - (p - 7.5) / 1.5;
+
+    const c0 = P([SX, 0, 0]), glow = ctx.createRadialGradient(c0[0], c0[1], 0, c0[0], c0[1], 300 * sc);
+    glow.addColorStop(0, rgba(col.accent, 0.06 + 0.12 * g)); glow.addColorStop(1, rgba(col.accent, 0));
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+    // the picture: a chamfered frame, its pixel grid and the object's silhouette
+    ctx.lineWidth = 1;
+    path(FRAME); ctx.fillStyle = rgba(mix(col.bg, col.accent, 0.08), 0.9); ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.strokeStyle = rgba(col.accent, 0.1); ctx.beginPath();
+    for (let k = 1; k < 8; k++) {
+      const o = -h + k * h / 4;
+      [[[PX + o, -h, 0], [PX + o, h, 0]], [[PX - h, o, 0], [PX + h, o, 0]]].forEach(([a, b]) => { const q = P(a), r = P(b); ctx.moveTo(q[0], q[1]); ctx.lineTo(r[0], r[1]); });
+    }
+    ctx.stroke();
+    path(OUTLINE); ctx.fillStyle = rgba(col.accent, 0.22 - 0.12 * g); ctx.fill();
+    ctx.strokeStyle = rgba(col.accent, 0.45); ctx.stroke();
+    ctx.restore();
+    path(FRAME); ctx.strokeStyle = rgba(col.accent, 0.55); ctx.lineWidth = 1.2; ctx.stroke();
+
+    // each vertex between its place in the picture and its place on the solid; the base lifts first
+    const spin = t * 0.5, trails: number[][] = [];
+    const pts = V.map((v) => {
+      let u = Math.max(0, Math.min(1, g * 1.5 - (v[1] + 80) / 320)); u = u * u * (3 - 2 * u);
+      const m = rot(v, spin, 0), home = [PX + v[0], v[1], 0];
+      const q = P([home[0] + (m[0] + SX - home[0]) * u, v[1], m[2] * u - Math.sin(u * Math.PI) * 70]);
+      if (u > 0.02 && u < 0.98) { const o = P(home); trails.push([o[0], o[1], q[0], q[1], Math.sin(u * Math.PI)]); }
+      return q;
+    });
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 1;
+    trails.forEach(([x0, y0, x1, y1, a]) => {
+      const gr = ctx.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, rgba(col.hot, 0)); gr.addColorStop(1, rgba(col.hot, 0.35 * a));
+      ctx.strokeStyle = gr; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    });
+    E.forEach((e) => {
+      const a = pts[e[0]], b = pts[e[1]], dz = Math.max(0, Math.min(1, (cam + 110 - (a[2] + b[2]) / 2) / 220));
+      ctx.strokeStyle = rgba(col.accent, 0.18 + dz * 0.62); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    });
+    pts.forEach((q) => { ctx.fillStyle = rgba(col.hot, 0.85); ctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3); });
+    ctx.globalCompositeOperation = 'source-over';
+  };
+}
+
+const SCENES: Record<SceneKind, (opt: SceneOptions) => Draw> = { forge: makeForge, engine: makeEngine, brain: makeBrain, shader: makeShader, strata: makeStrata, rpu: makeRpu, runner: makeRunner };
 
 export function startScene(canvas: HTMLCanvasElement, kind: SceneKind, opt: SceneOptions): () => void {
   // The black hole is the pack's own GLSL in WebGL; makeShader stays as the no-WebGL fallback.

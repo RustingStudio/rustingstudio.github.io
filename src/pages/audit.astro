@@ -5,15 +5,15 @@ import SiteFooter from '../components/SiteFooter.astro';
 import StatRow from '../components/StatRow.astro';
 import Callout from '../components/Callout.astro';
 import Button from '../components/Button.astro';
-import { PROJECTS, GH } from '../data/projects';
+import { PROJECTS, GH, u } from '../data/projects';
 
 const CONTACT = 'mailto:rustingstudio@gmail.com?subject=LLM%20performance%20audit';
 const strata = PROJECTS.strata;
 
 const offers = [
   {
-    tag: 'Audit', name: 'LLM performance audit', price: 'from €250',
-    text: 'One machine, one model, up to two backends (for example llama.cpp and RustingStrata). Decode, prefill, latency and memory, measured the same way for each. You get a written report with the numbers, the bottleneck, and the settings I would change.',
+    tag: 'Audit', name: 'LLM performance audit', price: '€50–200, by setup',
+    text: 'One machine, one model, up to two backends (for example llama.cpp and RustingStrata). Decode, prefill, latency and memory, measured the same way for each. You get a written report with the numbers, the bottleneck, and the settings I would change. Price depends on the setup: one GPU is simplest; several GPUs or CPU offload take more work.',
   },
   {
     tag: 'Pilot', name: 'Optimization pilot', price: 'from €600',
@@ -74,6 +74,7 @@ const steps = [
               <small>Step {i + 1}</small>
               <b>{title}</b>
               <p>{text}</p>
+              {i === 1 && <a class="audit-link" href={u('/audit/bench.py')} download>Download bench.py</a>}
             </li>
           ))}
         </ol>
@@ -118,6 +119,7 @@ const steps = [
   .audit-lede a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
   .audit-price { font-family: var(--font-mono); font-size: 14px; color: var(--ink); }
   .audit-offer p { -webkit-line-clamp: unset; }
+  .audit-link { margin-top: auto; padding-top: var(--space-2); font-family: var(--font-mono); font-size: 13px; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
   .audit-steps { list-style: none; padding: 0; margin: 0; }
   .audit-narrow :global(.gr-callout) { margin-bottom: var(--space-8); }
 </style>

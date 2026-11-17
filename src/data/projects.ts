@@ -1,6 +1,6 @@
 // Copy and measured stats from design-system/components/bundle.js (PROJECTS).
-export type ProjectId = 'engine' | 'brain' | 'shader' | 'strata' | 'rpu';
-export type Theme = 'copper' | 'verdigris' | 'cobalt' | 'amethyst' | 'phosphor';
+export type ProjectId = 'engine' | 'brain' | 'shader' | 'strata' | 'rpu' | 'runner';
+export type Theme = 'copper' | 'verdigris' | 'cobalt' | 'amethyst' | 'phosphor' | 'tourmaline';
 
 export interface Project {
   id: ProjectId; theme: Theme; scene: ProjectId; index: string;
@@ -94,9 +94,25 @@ export const PROJECTS: Record<ProjectId, Project> = {
     code: { lang: 'rust', title: 'src/main.rs', text: 'use rusting_pu::{quant, Rpu, TILE};\n\nlet mut rpu = Rpu::new()?;\nlet c = rpu.run_tile_i8(&a, &b)?;\nassert_eq!(c, quant::matmul_nt_i8(&a, &b, TILE, TILE, TILE));\nprintln!("{} cycles", rpu.cycles());', hl: [4] },
     repo: GH + 'RustingPU',
   },
+  runner: {
+    id: 'runner', theme: 'tourmaline', scene: 'runner', index: '06',
+    name: 'RustingRunner', stem: 'Runner',
+    kicker: 'Model runner / Image to 3D / Rust',
+    short: 'Runs released Rusting models in Rust, on RustingBrain. One model so far: Kaze-3D-v0.1, one image in, one mesh out.',
+    lede: 'Run released Rusting models from one Rust binary: inference only, on RustingBrain, no Python. One model so far, Kaze-3D-v0.1: one image in, one mesh (GLB) out, on an NVIDIA card or the CPU. It is an early release, geometry only: it gets the rough shape and size of an object, misses detail and exact proportions, and makes no texture and no colour.',
+    stats: [
+      { value: '4', unit: 's', label: 'Per mesh on an RTX 3060, weight loading included' },
+      { value: '2.1', unit: 'GiB', label: 'Card memory, about' },
+      { value: '103M', label: 'Parameter flow transformer' },
+    ],
+    statsFoot: 'Kaze-3D-v0.1 on an RTX 3060; 46 s on the CPU alone (Ryzen 5 7600X). Early release, geometry only: F@0.02 of 0.215 on 64 held-out objects, against our target of 0.55.',
+    tags: ['Image to GLB mesh', 'CUDA or CPU', 'No Python', 'Apache-2.0 weights', '112,364 CC-BY and CC0 training objects'],
+    code: { lang: 'bash', title: 'run', text: '$ cargo build --release --features cuda\n$ rusting-runner 3d --weights Kaze-3D-v0.1 \\\n    --image my-object.png --out my-object.glb --cuda 0', hl: [2, 3] },
+    repo: GH + 'RustingRunner',
+  },
 };
 
-export const IDS: ProjectId[] = ['engine', 'brain', 'shader', 'strata', 'rpu'];
+export const IDS: ProjectId[] = ['engine', 'brain', 'shader', 'strata', 'rpu', 'runner'];
 
 /** RustingScience: posts on the site, written in their own repository. Not a project, so no theme of its own. */
 export const SCIENCE = {
